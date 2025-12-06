@@ -14,9 +14,13 @@
     <h1>Calepinage de modules</h1>
     <p>
       La somme des modules est toujours <strong>≤ longueur du mur</strong>.<br>
+      Les modules ont une <strong>hauteur max de 320 mm</strong> : on compose le meuble
+      en <strong>plusieurs étages</strong> (160, 320, etc.) pour approcher au mieux la hauteur demandée.<br>
+      Tu peux définir une <strong>plinthe/fileur bas</strong> et un <strong>top technique</strong>,
+      puis laisser l’appli proposer une hauteur optimisée du corps du meuble.<br>
       Tu peux <strong>réordonner</strong> les modules (drag & drop),
-      <strong>ajouter / supprimer</strong des modules par format,
-      et <strong>sauvegarder / recharger</strong un projet.
+      <strong>ajouter / supprimer</strong des modules par format, et
+      <strong>sauvegarder / recharger</strong un projet.
     </p>
   </div>
 
@@ -26,8 +30,22 @@
     <label for="wallLength">Longueur du mur (en mm)</label>
     <input id="wallLength" type="number" min="1" step="1" placeholder="ex : 3470">
 
-    <label for="heightInput">Hauteur du meuble (en mm, optionnelle)</label>
-    <input id="heightInput" type="number" min="1" step="1" placeholder="ex : 900">
+    <label for="heightInput">Hauteur totale cible du meuble (en mm)</label>
+    <input id="heightInput" type="number" min="1" step="1" placeholder="ex : 950">
+
+    <label for="plinthInput">Hauteur plinthe / fileur bas (en mm, optionnelle)</label>
+    <input id="plinthInput" type="number" min="0" step="1" placeholder="ex : 80">
+
+    <label for="topInput">Hauteur top technique (en mm, optionnelle)</label>
+    <input id="topInput" type="number" min="0" step="1" placeholder="ex : 60">
+
+    <label for="vertModulesInput">Hauteurs possibles des étages (≤ 320 mm, séparées par des virgules)</label>
+    <textarea id="vertModulesInput">320</textarea>
+    <p class="hint">
+      Par ex. <em>160, 320</em> pour faire des étages de 160 et 320 mm.<br>
+      L’algorithme choisit une combinaison d’étages pour le <strong>corps du meuble</strong> (entre plinthe et top)
+      qui ne dépasse pas la hauteur disponible et minimise l’écart.
+    </p>
 
     <label for="modulesInput">Largeurs de modules (en mm, séparées par des virgules)</label>
     <textarea id="modulesInput">200, 240, 320, 480, 640, 960, 1280</textarea>
@@ -45,7 +63,7 @@
       L’algorithme propose une combinaison initiale optimale sans dépasser le mur.
     </p>
 
-    <label for="targetTol">Tolérance cible max (jeu résiduel, ± mm, optionnelle)</label>
+    <label for="targetTol">Tolérance cible max (jeu résiduel horizontal, ± mm, optionnelle)</label>
     <input id="targetTol" type="number" min="0" step="1" placeholder="ex : 20">
 
     <button id="computeBtn">Calculer la combinaison optimale</button>
