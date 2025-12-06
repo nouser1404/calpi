@@ -46,7 +46,7 @@
       resize: vertical;
     }
     button {
-      margin-top: 1.5rem;
+      margin-top: 1rem;
       padding: 0.6rem 1.2rem;
       font-size: 1rem;
       border: 1px solid #ccc;
@@ -105,6 +105,12 @@
       color: #8a5f00;
       background: #fff4d7;
     }
+    .preset-buttons button {
+      margin-right: 0.5rem;
+      margin-top: 0.5rem;
+      font-size: 0.9rem;
+      padding: 0.4rem 0.8rem;
+    }
   </style>
 </head>
 <body>
@@ -124,10 +130,22 @@
 
     <label for="modulesInput">Largeurs de modules (en mm, séparées par des virgules)</label>
     <textarea id="modulesInput">200, 240, 320, 480, 640, 960, 1280</textarea>
+
+    <div class="preset-buttons">
+      <p style="font-size:0.9rem; color:#555; margin-top:0.5rem;">
+        Presets de formats :
+      </p>
+      <button type="button" id="presetStd">Standard 200–1280</button>
+      <button type="button" id="preset300">Gamme 300 / 450 / 600 / 900 / 1200</button>
+    </div>
+
     <p style="font-size:0.9rem; color:#555;">
       Tu peux mettre d’autres formats, par ex : <em>300, 450, 600, 900, 1200</em>.  
       L’algorithme s’adapte et propose la meilleure combinaison possible.
     </p>
+
+    <label for="targetTol">Tolérance cible max (± mm, optionnelle)</label>
+    <input id="targetTol" type="number" min="0" step="1" placeholder="ex : 20">
 
     <button id="computeBtn">Calculer la combinaison optimale</button>
 
@@ -181,12 +199,11 @@
       const wallUnitsFloat = wallLength / step;
       const maxWidth = Math.max(...moduleWidths);
 
-      // On calcule jusqu’à wall + 2 * plus grand module (en unités)
+      // On calcule jusqu’à mur + 2 * plus grand module (en unités)
       const maxUnits = Math.round(wallUnitsFloat + (2 * maxWidth) / step);
       if (maxUnits <= 0) return null;
 
-      // DP : dp[i] = meilleure solution pour atteindre exactement i unités
-      // solution = { count, counts[], totalUnits }
+      // DP : dp[i] = meilleure solution pour i unités exactes
       const dp = new Array(maxUnits + 1).fill(null);
       dp[0] = {
         count: 0,
@@ -250,7 +267,7 @@
       };
     }
 
-    function formatResult(result) {
+    function formatResult(result, targetTol) {
       const { moduleWidths, wallLength, totalLength, diff, solution } = result;
       const counts = solution.counts;
 
@@ -263,10 +280,14 @@
                  <span class="tag">écart ${diff >= 0 ? "+" : ""}${diff.toFixed(0)} mm</span></p>`;
       html += `<p><strong>Tolérance minimale nécessaire :</strong> ±${tolMin} mm`;
 
-      if (tolMin <= 20) {
-        html += ` <span class="tag tag-ok">OK pour ton objectif ±20 mm</span>`;
-      } else {
-        html += ` <span class="tag tag-warn">> 20 mm, revoir les formats si tu veux plus serré</span>`;
+      if (typeof targetTol === "number" && !isNaN(targetTol) && targetTol >= 0) {
+        if (tolMin <= targetTol) {
+          html += ` <span class="tag tag-ok">OK pour ta tolérance cible (±${targetTol} mm)</span>`;
+        } else {
+          html += ` <span class="tag tag-warn">> tolérance cible (±${targetTol} mm) – gamme à optimiser</span>`;
+        }
+      } else if (tolMin <= 20) {
+        html += ` <span class="tag tag-ok">OK pour objectif ±20 mm</span>`;
       }
       html += `</p>`;
 
@@ -293,7 +314,7 @@
 
       html += `<p style="font-size:0.9rem; color:#555;">
                  Tu peux absorber cette tolérance avec les fileurs, le jeu latéral ou la position des caissons.<br>
-                 Pour améliorer la précision, essaie d’autres largeurs de modules et compare la tolérance minimale.
+                 Pour améliorer la précision, essaie d’autres largeurs de modules ou réduis l’écart entre formats.
                </p>`;
 
       html += `</div>`;
@@ -304,6 +325,7 @@
     document.getElementById('computeBtn').addEventListener('click', () => {
       const wallInput = document.getElementById('wallLength');
       const modulesInput = document.getElementById('modulesInput');
+      const targetTolInput = document.getElementById('targetTol');
       const outDiv = document.getElementById('output');
       const errDiv = document.getElementById('error');
 
@@ -329,8 +351,20 @@
         return;
       }
 
-      outDiv.innerHTML = formatResult(result);
+      const targetTol = parseFloat(targetTolInput.value);
+      const targetTolValue = isNaN(targetTol) ? null : targetTol;
+
+      outDiv.innerHTML = formatResult(result, targetTolValue);
       outDiv.style.display = "block";
+    });
+
+    // ----- BOUTONS PRESETS -----
+    const modulesInputEl = document.getElementById('modulesInput');
+    document.getElementById('presetStd').addEventListener('click', () => {
+      modulesInputEl.value = "200, 240, 320, 480, 640, 960, 1280";
+    });
+    document.getElementById('preset300').addEventListener('click', () => {
+      modulesInputEl.value = "300, 450, 600, 900, 1200";
     });
 
     // ----- SERVICE WORKER -----
