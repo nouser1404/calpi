@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Calepinage de modules</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f5f5f5">
+  <link rel="manifest" href="manifest.webmanifest">
+  <!-- Icône de base pour les onglets -->
+  <link rel="icon" href="icon-192.png">
+  <style>
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      max-width: 800px;
+      margin: 2rem auto;
+      padding: 0 1rem;
+      line-height: 1.5;
+      background: #f7f7f7;
+    }
+    h1 {
+      font-size: 1.6rem;
+      margin-bottom: 0.25rem;
+    }
+    h2 {
+      font-size: 1.1rem;
+      margin-top: 2rem;
+    }
+    p {
+      margin: 0.25rem 0;
+    }
+    label {
+      display: block;
+      margin-top: 1rem;
+      font-weight: 600;
+    }
+    input {
+      margin-top: 0.25rem;
+      padding: 0.4rem 0.6rem;
+      font-size: 1rem;
+      width: 100%;
+      max-width: 220px;
+      box-sizing: border-box;
+    }
+    button {
+      margin-top: 1.5rem;
+      padding: 0.6rem 1.2rem;
+      font-size: 1rem;
+      border: 1px solid #ccc;
+      background: #fff;
+      cursor: pointer;
+      border-radius: 4px;
+    }
+    button:hover {
+      background: #eee;
+    }
+    .card {
+      margin-top: 1.5rem;
+      padding: 1rem;
+      border-radius: 8px;
+      background: #ffffff;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+      border: 1px solid #e7e7e7;
+    }
+    .result {
+      margin-top: 1rem;
+    }
+    table {
+      border-collapse: collapse;
+      margin-top: 1rem;
+      width: 100%;
+      max-width: 500px;
+    }
+    th, td {
+      border: 1px solid #ddd;
+      padding: 0.4rem 0.6rem;
+      text-align: right;
+    }
+    th {
+      background: #f0f0f0;
+    }
+    .error {
+      color: #b00;
+      margin-top: 1rem;
+    }
+    .tag {
+      display: inline-block;
+      padding: 0.15rem 0.4rem;
+      border-radius: 4px;
+      border: 1px solid #ddd;
+      font-size: 0.8rem;
+      margin-left: 0.25rem;
+      background: #fafafa;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Calepinage de modules</h1>
+    <p>
+      Largeurs disponibles (mm) :
+      <strong>200, 240, 320, 480, 640, 960, 1280</strong><br>
+      Tolérance par défaut : ±20 mm (absorbé par fileurs / jeu).
+    </p>
+  </div>
+
+  <div class="card">
+    <h2>Paramètres</h2>
+
+    <label for="wallLength">Longueur du mur (en mm)</label>
+    <input id="wallLength" type="number" min="1" step="1" placeholder="ex : 3470">
+
+    <label for="tolerance">Tolérance (± mm)</label>
+    <input id="tolerance" type="number" min="0" step="1" value="20">
+
+    <button id="computeBtn">Calculer la combinaison</button>
+
+    <div id="error" class="error"></div>
+  </div>
+
+  <div id="output" class="card" style="display:none;"></div>
+
+  <script>
+    // ----- CONFIG MODULES -----
+    // Tu peux changer les noms (name) si tu veux avoir "Box S", "Box M", etc.
+    const STEP = 40; // pas en mm
+    const MODULES = [
+      { name: "Module XS", width: 200 },
+      { name: "Module S",  width: 240 },
+      { name: "Module M",  width: 320 },
+      { name: "Module L",  width: 480 },
+      { name: "Module XL", width: 640 },
+      { name: "Module XXL",width: 960 },
+      { name: "Module XXXL",width:1280 }
+    ];
+
+    const WIDTHS_MM   = MODULES.map(m => m.width);
+    const WIDTHS_UNITS = WIDTHS_MM.map(w => w / STEP); // en unités de 40 mm
+
+    // ----- LOGIQUE DE CALCUL -----
+    function computeCombination(wallLength, tolerance) {
+      if (wallLength <= 0) return null;
+
+      const nApprox = wallLength / STEP;
+      const tolUnits = Math.round(tolerance / STEP);
+
+      const candidates = [];
+      const nFloor = Math.floor(nApprox);
+      const nCeil = Math.ceil(nApprox);
+
+      const targets = new Set();
+      for (let n = nFloor - tolUnits; n <= nCeil + tolUnits; n++) {
+        if (n > 0) targets.add(n);
+      }
+
+      for (const target of targets) {
+        const solution = unboundedCoinChange(WIDTHS_UNITS, target);
+        if (solution) {
+          const totalUnits = solution.totalUnits;
+          const totalLength = totalUnits * STEP;
+          const diff = totalLength - wallLength;
+          if (Math.abs(diff) <= tolerance) {
+            candidates.push({
+              solution,
+              totalLength,
+              diff,
+              target
+            });
+          }
+        }
+      }
+
+      if (candidates.length === 0) return null;
+
+      // On prend la solution la plus proche, puis la plus compacte
+      candidates.sort((a, b) => {
+        const diffA = Math.abs(a.diff);
+        const diffB = Math.abs(b.diff);
+        if (diffA !== diffB) return diffA - diffB;
+        return a.solution.count - b.solution.count;
+      });
+
+      return candidates[0];
+    }
+
+    // Problème de rendu de monnaie non borné : on minimise le nombre total de modules
+    function unboundedCoinChange(widthsUnits, targetUnits) {
+      const maxUnits = targetUnits;
+      const dp = Array(maxUnits + 1).fill(null);
+      dp[0] = {
+        count: 0,
+        counts: Array(widthsUnits.length).fill(0),
+        totalUnits: 0
+      };
+
+      for (let i = 1; i <= maxUnits; i++) {
+        let best = null;
+        for (let j = 0; j < widthsUnits.length; j++) {
+          const w = widthsUnits[j];
+          if (i - w >= 0 && Number.isInteger(i - w)) {
+            const prev = dp[i - w];
+            if (prev) {
+              const candidateCount = prev.count + 1;
+              if (!best || candidateCount < best.count) {
+                const newCounts = prev.counts.slice();
+                newCounts[j]++;
+                best = {
+                  count: candidateCount,
+                  counts: newCounts,
+                  totalUnits: i
+                };
+              }
+            }
+          }
+        }
+        dp[i] = best;
+      }
+
+      return dp[targetUnits] || null;
+    }
+
+    function formatResult(wallLength, tolerance, result) {
+      const { solution, totalLength, diff } = result;
+      const counts = solution.counts;
+
+      let html = "";
+      html += `<div class="result">`;
+      html += `<p><strong>Longueur du mur :</strong> ${wallLength.toFixed(0)} mm</p>`;
+      html += `<p><strong>Longueur obtenue :</strong> ${totalLength.toFixed(0)} mm 
+                 <span class="tag">écart ${diff >= 0 ? "+" : ""}${diff.toFixed(0)} mm</span></p>`;
+      html += `<p><strong>Nombre total de modules :</strong> ${solution.count}</p>`;
+
+      html += `<table><thead><tr>
+               <th style="text-align:left;">Module</th>
+               <th>Largeur (mm)</th>
+               <th>Qté</th>
+               <th>Total (mm)</th>
+               </tr></thead><tbody>`;
+      MODULES.forEach((m, idx) => {
+        const q = counts[idx];
+        if (q > 0) {
+          html += `<tr>
+                     <td style="text-align:left;">${m.name}</td>
+                     <td>${m.width}</td>
+                     <td>${q}</td>
+                     <td>${q * m.width}</td>
+                   </tr>`;
+        }
+      });
+      html += `</tbody></table>`;
+
+      html += `<p>Tu peux absorber les ±${tolerance} mm avec les fileurs, le jeu latéral ou la position des caissons.</p>`;
+      html += `</div>`;
+
+      return html;
+    }
+
+    // ----- UI -----
+    document.getElementById('computeBtn').addEventListener('click', () => {
+      const wallInput = document.getElementById('wallLength');
+      const tolInput = document.getElementById('tolerance');
+      const outDiv = document.getElementById('output');
+      const errDiv = document.getElementById('error');
+
+      errDiv.textContent = "";
+      outDiv.style.display = "none";
+      outDiv.innerHTML = "";
+
+      const wallLength = parseFloat(wallInput.value);
+      const tolerance = parseFloat(tolInput.value);
+
+      if (isNaN(wallLength) || wallLength <= 0) {
+        errDiv.textContent = "Merci d’indiquer une longueur de mur valide (en mm).";
+        return;
+      }
+      if (isNaN(tolerance) || tolerance < 0) {
+        errDiv.textContent = "Merci d’indiquer une tolérance valide (en mm).";
+        return;
+      }
+
+      const result = computeCombination(wallLength, tolerance);
+      if (!result) {
+        errDiv.textContent = "Aucune combinaison trouvée dans la tolérance demandée. Essaie d’augmenter légèrement la tolérance.";
+        return;
+      }
+
+      outDiv.innerHTML = formatResult(wallLength, tolerance, result);
+      outDiv.style.display = "block";
+    });
+
+    // ----- ENREGISTREMENT SERVICE WORKER -----
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("service-worker.js")
+          .catch(err => {
+            console.warn("Service worker non enregistré :", err);
+          });
+      });
+    }
+  </script>
+</body>
+</html>
