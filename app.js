@@ -31,7 +31,7 @@ function parseModules(text) {
   return unique;
 }
 
-// ----- SOLVEUR : COMBINAISON OPTIMALE ≤ mur -----
+// ----- SOLVEUR : COMBINAISON HORIZONTALE OPTIMALE ≤ mur -----
 
 function solveOptimalCombination(wallLength, moduleWidths) {
   if (wallLength <= 0 || moduleWidths.length === 0) return null;
@@ -111,6 +111,96 @@ function solveOptimalCombination(wallLength, moduleWidths) {
     solution: bestSolution.solution,
     totalLength: bestSolution.totalLength,
     gap: bestSolution.gap
+  };
+}
+
+// ----- SOLVEUR VERTICAL : COMBINAISON D'ÉTAGES ≤ hauteur corps -----
+
+function solveVerticalComposition(targetHeightMm, rawHeights) {
+  if (!targetHeightMm || targetHeightMm <= 0) return null;
+
+  // Nettoyage : hauteurs >0 et ≤ 320
+  let heights = (rawHeights && rawHeights.length ? rawHeights : [320])
+    .filter(h => h > 0 && h <= 320)
+    .sort((a, b) => a - b);
+
+  if (heights.length === 0) heights = [320];
+
+  const step = gcdArray(heights);
+  const heightsUnits = heights.map(h => h / step);
+  const targetUnits = Math.floor(targetHeightMm / step);
+
+  if (targetUnits <= 0) {
+    // au moins un étage de la plus petite hauteur
+    return { rowHeights: [heights[0]], realHeightMm: heights[0], targetHeightMm };
+  }
+
+  const dp = new Array(targetUnits + 1).fill(null);
+  dp[0] = {
+    count: 0,
+    counts: new Array(heights.length).fill(0),
+    totalUnits: 0
+  };
+
+  for (let i = 1; i <= targetUnits; i++) {
+    let best = null;
+    for (let j = 0; j < heightsUnits.length; j++) {
+      const h = heightsUnits[j];
+      if (i - h >= 0 && Number.isInteger(i - h)) {
+        const prev = dp[i - h];
+        if (prev) {
+          const candidateCount = prev.count + 1;
+          if (!best || candidateCount < best.count) {
+            const newCounts = prev.counts.slice();
+            newCounts[j]++;
+            best = {
+              count: candidateCount,
+              counts: newCounts,
+              totalUnits: i
+            };
+          }
+        }
+      }
+    }
+    dp[i] = best;
+  }
+
+  let bestSolution = null;
+  let bestGap = Infinity;
+
+  for (let i = 1; i <= targetUnits; i++) {
+    const sol = dp[i];
+    if (!sol) continue;
+    const lenMm = sol.totalUnits * step;
+    if (lenMm > targetHeightMm) continue;
+    const gap = targetHeightMm - lenMm;
+    if (!bestSolution || gap < bestGap || (gap === bestGap && sol.count < bestSolution.solution.count)) {
+      bestGap = gap;
+      bestSolution = {
+        solution: sol,
+        totalHeightMm: lenMm,
+        gap
+      };
+    }
+  }
+
+  if (!bestSolution) {
+    // aucun combo sous la hauteur : on met un étage minimal
+    return { rowHeights: [heights[0]], realHeightMm: heights[0], targetHeightMm };
+  }
+
+  const rowHeights = [];
+  heights.forEach((h, idx) => {
+    const q = bestSolution.solution.counts[idx];
+    for (let k = 0; k < q; k++) rowHeights.push(h);
+  });
+
+  if (rowHeights.length === 0) rowHeights.push(heights[0]);
+
+  return {
+    rowHeights,
+    realHeightMm: bestSolution.totalHeightMm,
+    targetHeightMm
   };
 }
 
@@ -196,45 +286,106 @@ function buildScaleHtml(wallLength) {
   return html;
 }
 
-// ----- VUE 2D DU MEUBLE -----
+// ----- VUE 2D DU MEUBLE (multi-étages + plinthe + top) -----
 
-function build2DViewHtml(layoutModules, wallLength, heightMm) {
-  if (!heightMm || heightMm <= 0) return "";
+function build2DViewHtml(layoutModules, wallLength, totalTargetHeightMm, verticalHeights, plinthMm, topMm) {
+  if (!totalTargetHeightMm || totalTargetHeightMm <= 0) return "";
+  if (!layoutModules || layoutModules.length === 0) return "";
+
+  const basePlinth = plinthMm > 0 ? plinthMm : 0;
+  const baseTop = topMm > 0 ? topMm : 0;
+
+  let bodyTarget = totalTargetHeightMm - basePlinth - baseTop;
+  if (bodyTarget <= 0) {
+    // Hauteur totale trop petite par rapport à plinthe+top : on se rabat sur un étage minimal
+    bodyTarget = Math.max(1, totalTargetHeightMm - basePlinth - baseTop);
+  }
+
+  const verticalInfo = solveVerticalComposition(bodyTarget, verticalHeights);
+  if (!verticalInfo) return "";
+
+  const { rowHeights, realHeightMm: bodyHeightMm, targetHeightMm: bodyTargetMm } = verticalInfo;
+
+  const totalRealHeightMm = basePlinth + bodyHeightMm + baseTop;
   const totalLength = layoutModules.reduce((s, m) => s + m.width, 0);
   if (totalLength <= 0) return "";
 
+  // Échelle verticale
   const targetWidthPx = 600;
   const scale = wallLength > 0 ? wallLength / targetWidthPx : 1;
-  let heightPx = heightMm / (scale || 1);
+  let heightPx = totalRealHeightMm / (scale || 1);
   if (heightPx > 350) heightPx = 350;
   if (heightPx < 80) heightPx = 80;
 
   let html = '<div class="view2d-wrapper">';
-  html += '<div class="view2d-title">Vue 2D du meuble (élévation)</div>';
+  html += '<div class="view2d-title">Vue 2D du meuble (plinthe + corps + top)</div>';
   html += `<div class="view2d-container" style="height:${heightPx}px;">`;
 
-  let currentX = 0;
-  layoutModules.forEach((mod) => {
-    const startX = currentX;
-    const width = mod.width;
-    const leftPct = (startX / totalLength) * 100;
-    const widthPct = (width / totalLength) * 100;
-    const clsColor = "module-color-" + (mod.index % 7);
-    html += `<div class="view2d-module ${clsColor}"
-                 style="left:${leftPct}%; width:${widthPct}%;">
-               <span>${width} mm</span>
+  const totalH = totalRealHeightMm;
+
+  // Plinthe (zone vide, mais représentée dans les proportions)
+  let currentTopMm = 0;
+  if (basePlinth > 0) {
+    const plinthPct = (basePlinth / totalH) * 100;
+    html += `<div class="view2d-module"
+                 style="left:0; width:100%; top:${currentTopMm / totalH * 100}%; height:${plinthPct}%; opacity:0.2;">
+               <span>Plinthe ${basePlinth.toFixed(0)} mm</span>
              </div>`;
-    currentX += width;
+    currentTopMm += basePlinth;
+  }
+
+  // Corps du meuble : étages de rangements
+  rowHeights.forEach((hRow) => {
+    const rowTopMm = currentTopMm;
+    const rowHeightPct = (hRow / totalH) * 100;
+    const topPct = (rowTopMm / totalH) * 100;
+    let currentX = 0;
+
+    layoutModules.forEach((mod) => {
+      const startX = currentX;
+      const width = mod.width;
+      const leftPct = (startX / totalLength) * 100;
+      const widthPct = (width / totalLength) * 100;
+      const clsColor = "module-color-" + (mod.index % 7);
+
+      html += `<div class="view2d-module ${clsColor}"
+                   style="left:${leftPct}%; width:${widthPct}%; top:${topPct}%; height:${rowHeightPct}%;">
+                 <span>${width} mm</span>
+               </div>`;
+      currentX += width;
+    });
+
+    currentTopMm += hRow;
   });
+
+  // Top technique
+  if (baseTop > 0) {
+    const topPct = (currentTopMm / totalH) * 100;
+    const topHeightPct = (baseTop / totalH) * 100;
+    html += `<div class="view2d-module"
+                 style="left:0; width:100%; top:${topPct}%; height:${topHeightPct}%; opacity:0.2;">
+               <span>Top ${baseTop.toFixed(0)} mm</span>
+             </div>`;
+  }
 
   html += '<div class="view2d-border"></div>';
   html += '</div>';
-  html += `<div class="view2d-caption">
-             Largeur totale meuble ≈ ${totalLength.toFixed(0)} mm (≤ mur ${wallLength.toFixed(0)} mm),
-             hauteur ${heightMm.toFixed(0)} mm (échelle adaptative).
-           </div>`;
-  html += '</div>';
 
+  const diffTotal = totalRealHeightMm - totalTargetHeightMm;
+  const diffBody = bodyHeightMm - bodyTargetMm;
+
+  html += `<div class="view2d-caption">
+             Composition verticale optimisée (règle de proportionnalité sur les hauteurs d’étage) :<br>
+             Plinthe/fileur bas : ${basePlinth.toFixed(0)} mm<br>
+             Corps du meuble : ${rowHeights.join(" + ")} mm ≈ ${bodyHeightMm.toFixed(0)} mm
+             (cible corps ≈ ${bodyTargetMm.toFixed(0)} mm, écart ${diffBody >= 0 ? "+" : ""}${diffBody.toFixed(0)} mm)<br>
+             Top technique : ${baseTop.toFixed(0)} mm<br>
+             Hauteur totale réalisée : ${totalRealHeightMm.toFixed(0)} mm
+             (cible ${totalTargetHeightMm.toFixed(0)} mm, écart ${diffTotal >= 0 ? "+" : ""}${diffTotal.toFixed(0)} mm).<br>
+             Largeur totale meuble ≈ ${totalLength.toFixed(0)} mm (≤ mur ${wallLength.toFixed(0)} mm).
+           </div>`;
+
+  html += '</div>';
   return html;
 }
 
@@ -259,7 +410,7 @@ function buildEditModulesHtml(metrics) {
 
 // ----- FORMATAGE GLOBAL DU RÉSULTAT -----
 
-function formatResult(metrics, targetTol, heightMm) {
+function formatResult(metrics, targetTol) {
   const { wallLength, totalLength, gap, counts, moduleWidths, countTotal } = metrics;
   const tol = Math.round(gap);
 
@@ -267,7 +418,7 @@ function formatResult(metrics, targetTol, heightMm) {
   html += `<p><strong>Longueur du mur :</strong> ${wallLength.toFixed(0)} mm</p>`;
   html += `<p><strong>Longueur totale des modules :</strong> ${totalLength.toFixed(0)} mm 
              <span class="tag">jeu résiduel ${tol} mm</span></p>`;
-  html += `<p><strong>Tolérance actuelle nécessaire :</strong> ±${tol} mm`;
+  html += `<p><strong>Tolérance horizontale nécessaire :</strong> ±${tol} mm`;
 
   if (typeof targetTol === "number" && !isNaN(targetTol) && targetTol >= 0) {
     if (tol <= targetTol) {
@@ -313,8 +464,8 @@ function formatResult(metrics, targetTol, heightMm) {
            </div>`;
 
   html += `<p style="font-size:0.9rem; color:#555;">
-             Le meuble ne dépasse jamais le mur. Le jeu résiduel est à prendre dans les fileurs / joues / marges.<br>
-             Tu peux réordonner les modules dans la barre du haut (drag & drop) et ajuster les quantités avec les boutons + / -.
+             Le meuble ne dépasse jamais le mur. Le jeu résiduel horizontal est à prendre dans les fileurs / joues / marges.<br>
+             Verticalement, la hauteur est optimisée en combinant des étages ≤ 320 mm entre une plinthe et un top technique.
            </p>`;
 
   html += `</div>`;
@@ -338,7 +489,18 @@ function renderAll() {
   const heightMm = parseFloat(heightInput.value);
   const heightValue = isNaN(heightMm) ? null : heightMm;
 
-  outDiv.innerHTML = formatResult(metrics, targetTolValue, heightValue);
+  const plinthInput = document.getElementById("plinthInput");
+  const topInput = document.getElementById("topInput");
+  const plinthMm = parseFloat(plinthInput.value);
+  const topMm = parseFloat(topInput.value);
+  const plinthVal = isNaN(plinthMm) ? 0 : plinthMm;
+  const topVal = isNaN(topMm) ? 0 : topMm;
+
+  const vertInputEl = document.getElementById("vertModulesInput");
+  const vertHeightsParsed = parseModules(vertInputEl.value || "");
+  const verticalHeights = vertHeightsParsed || [320];
+
+  outDiv.innerHTML = formatResult(metrics, targetTolValue);
   outDiv.style.display = "block";
 
   const visual1dContainer = document.getElementById("visual1d");
@@ -347,7 +509,14 @@ function renderAll() {
 
   render1DBar(visual1dContainer, currentLayoutModules, metrics.totalLength);
   scaleContainer.innerHTML = buildScaleHtml(metrics.wallLength);
-  view2dContainer.innerHTML = build2DViewHtml(currentLayoutModules, metrics.wallLength, heightValue);
+  view2dContainer.innerHTML = build2DViewHtml(
+    currentLayoutModules,
+    metrics.wallLength,
+    heightValue,
+    verticalHeights,
+    plinthVal,
+    topVal
+  );
 
   setupDragAndDrop();
   setupEditButtons();
@@ -464,15 +633,26 @@ function setupExportJsonButton() {
 
     const heightInput = document.getElementById("heightInput");
     const targetTolInput = document.getElementById("targetTol");
+    const vertInputEl = document.getElementById("vertModulesInput");
+    const plinthInput = document.getElementById("plinthInput");
+    const topInput = document.getElementById("topInput");
+
     const heightMm = parseFloat(heightInput.value);
     const targetTol = parseFloat(targetTolInput.value);
+    const vertHeightsParsed = parseModules(vertInputEl.value || "");
+    const verticalHeights = vertHeightsParsed || [320];
+    const plinthMm = parseFloat(plinthInput.value);
+    const topMm = parseFloat(topInput.value);
 
     const data = {
       wallLength,
       moduleWidths,
       layoutModules: currentLayoutModules,
       heightMm: isNaN(heightMm) ? null : heightMm,
-      targetTol: isNaN(targetTol) ? null : targetTol
+      targetTol: isNaN(targetTol) ? null : targetTol,
+      verticalHeights,
+      plinthMm: isNaN(plinthMm) ? null : plinthMm,
+      topMm: isNaN(topMm) ? null : topMm
     };
 
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
@@ -507,7 +687,6 @@ function setupImportJsonButton() {
           return;
         }
 
-        // Recharger l'état
         currentResult = {
           wallLength: data.wallLength,
           moduleWidths: data.moduleWidths.slice()
@@ -516,14 +695,23 @@ function setupImportJsonButton() {
           ? data.layoutModules.map(m => ({ width: m.width, index: m.index }))
           : [];
 
-        // Remettre les champs
         document.getElementById("wallLength").value = String(data.wallLength);
         document.getElementById("modulesInput").value = data.moduleWidths.join(", ");
+
         if (typeof data.heightMm === "number") {
           document.getElementById("heightInput").value = String(data.heightMm);
         }
         if (typeof data.targetTol === "number") {
           document.getElementById("targetTol").value = String(data.targetTol);
+        }
+        if (Array.isArray(data.verticalHeights)) {
+          document.getElementById("vertModulesInput").value = data.verticalHeights.join(", ");
+        }
+        if (typeof data.plinthMm === "number") {
+          document.getElementById("plinthInput").value = String(data.plinthMm);
+        }
+        if (typeof data.topMm === "number") {
+          document.getElementById("topInput").value = String(data.topMm);
         }
 
         renderAll();
@@ -571,7 +759,6 @@ document.getElementById("computeBtn").addEventListener("click", () => {
     moduleWidths: solved.moduleWidths
   };
 
-  // Construire le layout initial à partir des counts
   currentLayoutModules = [];
   solved.moduleWidths.forEach((w, idx) => {
     const q = solved.solution.counts[idx];
