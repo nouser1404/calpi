@@ -258,7 +258,7 @@ th {
   white-space: nowrap;
 }
 
-/* --- VUE 2D DU MEUBLE --- */
+/* --- VUE 2D DU MEUBLE (multi-étages) --- */
 
 .view2d-wrapper {
   margin-top: 1.5rem;
@@ -282,8 +282,6 @@ th {
 
 .view2d-module {
   position: absolute;
-  top: 0;
-  bottom: 0;
   border-right: 1px solid #ffffff;
   box-sizing: border-box;
   display: flex;
