@@ -111,6 +111,153 @@
       font-size: 0.9rem;
       padding: 0.4rem 0.8rem;
     }
+
+    /* --- VISUEL 1D DES MODULES --- */
+    .visual-wrapper {
+      margin-top: 1.2rem;
+    }
+    .visual-bar {
+      display: flex;
+      width: 100%;
+      height: 60px;
+      border-radius: 6px;
+      overflow: hidden;
+      border: 1px solid #ddd;
+      background: #fdfdfd;
+    }
+    .module-block {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.75rem;
+      border-right: 1px solid rgba(255,255,255,0.7);
+      box-sizing: border-box;
+      white-space: nowrap;
+      padding: 0 4px;
+      color: #222;
+    }
+    .module-block:last-child {
+      border-right: none;
+    }
+    .module-color-0 { background: #dfe9ff; }
+    .module-color-1 { background: #ffe4d9; }
+    .module-color-2 { background: #e6f7e8; }
+    .module-color-3 { background: #fff7cc; }
+    .module-color-4 { background: #f3e5ff; }
+    .module-color-5 { background: #ffebf2; }
+    .module-color-6 { background: #e0f0f5; }
+    .visual-caption {
+      margin-top: 0.4rem;
+      font-size: 0.85rem;
+      color: #555;
+    }
+
+    /* --- GRADUATION DU MUR --- */
+    .scale-wrapper {
+      margin-top: 1.2rem;
+    }
+    .scale-title {
+      font-size: 0.9rem;
+      color: #555;
+      margin-bottom: 0.3rem;
+    }
+    .scale-bar {
+      position: relative;
+      display: flex;
+      width: 100%;
+      height: 28px;
+      border-radius: 4px;
+      border: 1px solid #ddd;
+      background: #fafafa;
+      overflow: hidden;
+    }
+    .scale-origin {
+      position: absolute;
+      bottom: -1.1rem;
+      left: 0;
+      font-size: 0.7rem;
+      color: #555;
+    }
+    .scale-segment {
+      flex-grow: 1;
+      border-right: 1px dashed #ccc;
+      position: relative;
+    }
+    .scale-segment:last-child {
+      border-right: none;
+    }
+    .scale-tick {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 0;
+      border-left: 1px solid #999;
+      height: 50%;
+    }
+    .scale-label {
+      position: absolute;
+      bottom: -1.1rem;
+      right: 2px;
+      font-size: 0.7rem;
+      color: #555;
+      transform: translateX(50%);
+      white-space: nowrap;
+    }
+
+    /* --- VUE 2D DU MEUBLE --- */
+    .view2d-wrapper {
+      margin-top: 1.5rem;
+    }
+    .view2d-title {
+      font-size: 0.9rem;
+      color: #555;
+      margin-bottom: 0.3rem;
+    }
+    .view2d-container {
+      position: relative;
+      margin: 0 auto;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      background: #fdfdfd;
+      overflow: hidden;
+      max-width: 600px;
+    }
+    .view2d-module {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      border-right: 1px solid #ffffff;
+      box-sizing: border-box;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-size: 0.75rem;
+      color: #222;
+      padding: 0 4px;
+      white-space: nowrap;
+    }
+    .view2d-border {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      border: 2px solid rgba(0,0,0,0.25);
+      pointer-events: none;
+    }
+    .view2d-caption {
+      margin-top: 0.4rem;
+      font-size: 0.8rem;
+      color: #555;
+    }
+
+    /* --- EXPORT --- */
+    .export-buttons {
+      margin-top: 1rem;
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
   </style>
 </head>
 <body>
@@ -118,7 +265,9 @@
     <h1>Calepinage de modules</h1>
     <p>
       Donne la longueur du mur et les largeurs de modules (en mm).<br>
-      L’appli calcule la <strong>tolérance minimale</strong> et la combinaison de modules la plus compacte.
+      L’appli calcule la <strong>tolérance minimale</strong>, la combinaison de modules la plus compacte,  
+      et t’affiche un <strong>rendu visuel 1D</strong>, une <strong>graduation du mur</strong>,  
+      et une <strong>vue 2D du meuble</strong> (si tu donnes la hauteur).
     </p>
   </div>
 
@@ -127,6 +276,9 @@
 
     <label for="wallLength">Longueur du mur (en mm)</label>
     <input id="wallLength" type="number" min="1" step="1" placeholder="ex : 3470">
+
+    <label for="heightInput">Hauteur du meuble (en mm, optionnelle)</label>
+    <input id="heightInput" type="number" min="1" step="1" placeholder="ex : 900">
 
     <label for="modulesInput">Largeurs de modules (en mm, séparées par des virgules)</label>
     <textarea id="modulesInput">200, 240, 320, 480, 640, 960, 1280</textarea>
@@ -153,6 +305,9 @@
   </div>
 
   <div id="output" class="card" style="display:none;"></div>
+
+  <!-- html2canvas pour l’export PNG -->
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 
   <script>
     // ----- UTILITAIRE GCD -----
@@ -182,7 +337,6 @@
         }
         widths.push(v);
       }
-      // On enlève les doublons
       const unique = Array.from(new Set(widths)).sort((a, b) => a - b);
       return unique;
     }
@@ -191,19 +345,15 @@
     function computeBestCombination(wallLength, moduleWidths) {
       if (wallLength <= 0 || moduleWidths.length === 0) return null;
 
-      // On calcule un pas qui divise toutes les largeurs (gcd),
-      // pour travailler en "unités" et simplifier le DP.
       const step = gcdArray(moduleWidths);
       const widthsUnits = moduleWidths.map(w => w / step);
 
       const wallUnitsFloat = wallLength / step;
       const maxWidth = Math.max(...moduleWidths);
 
-      // On calcule jusqu’à mur + 2 * plus grand module (en unités)
       const maxUnits = Math.round(wallUnitsFloat + (2 * maxWidth) / step);
       if (maxUnits <= 0) return null;
 
-      // DP : dp[i] = meilleure solution pour i unités exactes
       const dp = new Array(maxUnits + 1).fill(null);
       dp[0] = {
         count: 0,
@@ -234,7 +384,6 @@
         dp[i] = best;
       }
 
-      // On cherche la longueur réalisable la plus proche du mur
       let bestSolution = null;
       let bestDiffAbs = Infinity;
 
@@ -267,14 +416,131 @@
       };
     }
 
-    function formatResult(result, targetTol) {
+    // ----- VISUEL 1D DES MODULES -----
+    function buildVisualHtml(moduleWidths, counts, totalLength) {
+      const blocks = [];
+      moduleWidths.forEach((w, idx) => {
+        const q = counts[idx];
+        for (let k = 0; k < q; k++) {
+          blocks.push({ width: w, index: idx });
+        }
+      });
+
+      if (blocks.length === 0) return "";
+
+      let html = '<div class="visual-wrapper">';
+      html += '<div class="visual-bar">';
+      blocks.forEach((block) => {
+        const flexGrow = block.width;
+        const cls = "module-block module-color-" + (block.index % 7);
+        html += `<div class="${cls}" style="flex-grow:${flexGrow};">
+                   <span>${block.width} mm</span>
+                 </div>`;
+      });
+      html += '</div>';
+      html += `<div class="visual-caption">
+                 Vue en plan frontale : chaque rectangle = un module, 
+                 la barre complète ≈ ${totalLength.toFixed(0)} mm.
+               </div>`;
+      html += '</div>';
+
+      return html;
+    }
+
+    // ----- GRADUATION DU MUR -----
+    function buildScaleHtml(wallLength) {
+      const step = 500; // pas de 500 mm
+      if (wallLength <= 0) return "";
+
+      const segments = [];
+      let current = 0;
+      while (current < wallLength) {
+        const remaining = wallLength - current;
+        const segLength = Math.min(step, remaining);
+        segments.push({ start: current, length: segLength });
+        current += segLength;
+      }
+
+      if (segments.length === 0) return "";
+
+      let html = '<div class="scale-wrapper">';
+      html += '<div class="scale-title">Graduation du mur (mm)</div>';
+      html += '<div class="scale-bar">';
+      html += '<div class="scale-origin">0</div>';
+
+      segments.forEach(seg => {
+        const endVal = seg.start + seg.length;
+        html += `<div class="scale-segment" style="flex-grow:${seg.length};">
+                   <div class="scale-tick"></div>
+                   <div class="scale-label">${endVal}</div>
+                 </div>`;
+      });
+
+      html += '</div>';
+      html += '</div>';
+      return html;
+    }
+
+    // ----- VUE 2D DU MEUBLE -----
+    function build2DViewHtml(moduleWidths, counts, wallLength, heightMm) {
+      if (!heightMm || heightMm <= 0) return "";
+
+      const totalModulesLength = moduleWidths.reduce((sum, w, i) => sum + w * counts[i], 0);
+      if (totalModulesLength <= 0) return "";
+
+      const targetWidthPx = 600;
+      const scale = wallLength > 0 ? wallLength / targetWidthPx : 1;
+      let heightPx = heightMm / (scale || 1);
+      if (heightPx > 350) {
+        const factor = 350 / heightPx;
+        heightPx *= factor;
+      }
+      if (heightPx < 80) {
+        heightPx = 80;
+      }
+
+      let html = '<div class="view2d-wrapper">';
+      html += '<div class="view2d-title">Vue 2D du meuble (élévation)</div>';
+      html += `<div class="view2d-container" style="height:${heightPx}px;">`;
+
+      let currentX = 0;
+      for (let i = 0; i < moduleWidths.length; i++) {
+        const w = moduleWidths[i];
+        const q = counts[i];
+        for (let k = 0; k < q; k++) {
+          const startX = currentX;
+          const endX = currentX + w;
+          const leftPct = (startX / totalModulesLength) * 100;
+          const widthPct = (w / totalModulesLength) * 100;
+          const clsColor = "module-color-" + (i % 7);
+
+          html += `<div class="view2d-module ${clsColor}" 
+                        style="left:${leftPct}%; width:${widthPct}%;">
+                     <span>${w} mm</span>
+                   </div>`;
+          currentX += w;
+        }
+      }
+
+      html += '<div class="view2d-border"></div>';
+      html += '</div>';
+      html += `<div class="view2d-caption">
+                 Largeur totale meuble ≈ ${totalModulesLength.toFixed(0)} mm, 
+                 hauteur ${heightMm.toFixed(0)} mm (échelle approximative adaptée à l’écran).
+               </div>`;
+      html += '</div>';
+
+      return html;
+    }
+
+    function formatResult(result, targetTol, heightMm) {
       const { moduleWidths, wallLength, totalLength, diff, solution } = result;
       const counts = solution.counts;
 
-      const tolMin = Math.round(Math.abs(diff)); // tolérance minimale en mm
+      const tolMin = Math.round(Math.abs(diff));
 
       let html = "";
-      html += `<div class="result">`;
+      html += `<div class="result" id="result-content">`;
       html += `<p><strong>Longueur du mur :</strong> ${wallLength.toFixed(0)} mm</p>`;
       html += `<p><strong>Longueur obtenue :</strong> ${totalLength.toFixed(0)} mm 
                  <span class="tag">écart ${diff >= 0 ? "+" : ""}${diff.toFixed(0)} mm</span></p>`;
@@ -293,6 +559,14 @@
 
       html += `<p><strong>Nombre total de modules :</strong> ${solution.count}</p>`;
 
+      // Visuel 1D
+      html += buildVisualHtml(moduleWidths, counts, totalLength);
+      // Graduation mur
+      html += buildScaleHtml(wallLength);
+      // Vue 2D (si hauteur fournie)
+      html += build2DViewHtml(moduleWidths, counts, wallLength, heightMm);
+
+      // Tableau
       html += `<h3>Détail par format</h3>`;
       html += `<table><thead><tr>
                <th style="text-align:left;">Largeur (mm)</th>
@@ -312,6 +586,11 @@
       });
       html += `</tbody></table>`;
 
+      // Boutons d’export
+      html += `<div class="export-buttons">
+                 <button type="button" id="exportPngBtn">Exporter le rendu en image (PNG)</button>
+               </div>`;
+
       html += `<p style="font-size:0.9rem; color:#555;">
                  Tu peux absorber cette tolérance avec les fileurs, le jeu latéral ou la position des caissons.<br>
                  Pour améliorer la précision, essaie d’autres largeurs de modules ou réduis l’écart entre formats.
@@ -321,11 +600,30 @@
       return html;
     }
 
+    // ----- EXPORT PNG -----
+    function setupExportButton() {
+      const btn = document.getElementById('exportPngBtn');
+      if (!btn || typeof html2canvas === "undefined") return;
+
+      btn.addEventListener('click', () => {
+        const resultDiv = document.getElementById('result-content');
+        if (!resultDiv) return;
+
+        html2canvas(resultDiv, { scale: 2 }).then(canvas => {
+          const link = document.createElement('a');
+          link.download = 'calepinage.png';
+          link.href = canvas.toDataURL('image/png');
+          link.click();
+        });
+      });
+    }
+
     // ----- UI -----
     document.getElementById('computeBtn').addEventListener('click', () => {
       const wallInput = document.getElementById('wallLength');
       const modulesInput = document.getElementById('modulesInput');
       const targetTolInput = document.getElementById('targetTol');
+      const heightInput = document.getElementById('heightInput');
       const outDiv = document.getElementById('output');
       const errDiv = document.getElementById('error');
 
@@ -354,8 +652,14 @@
       const targetTol = parseFloat(targetTolInput.value);
       const targetTolValue = isNaN(targetTol) ? null : targetTol;
 
-      outDiv.innerHTML = formatResult(result, targetTolValue);
+      const heightMm = parseFloat(heightInput.value);
+      const heightValue = isNaN(heightMm) ? null : heightMm;
+
+      outDiv.innerHTML = formatResult(result, targetTolValue, heightValue);
       outDiv.style.display = "block";
+
+      // brancher le bouton d’export une fois le DOM injecté
+      setupExportButton();
     });
 
     // ----- BOUTONS PRESETS -----
