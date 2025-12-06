@@ -112,7 +112,7 @@
       padding: 0.4rem 0.8rem;
     }
 
-    /* --- VISUEL 1D DES MODULES --- */
+    /* --- VISUEL 1D DES MODULES (DRAG & DROP) --- */
     .visual-wrapper {
       margin-top: 1.2rem;
     }
@@ -135,9 +135,13 @@
       white-space: nowrap;
       padding: 0 4px;
       color: #222;
+      cursor: grab;
     }
     .module-block:last-child {
       border-right: none;
+    }
+    .module-block.dragging {
+      opacity: 0.6;
     }
     .module-color-0 { background: #dfe9ff; }
     .module-color-1 { background: #ffe4d9; }
@@ -264,10 +268,9 @@
   <div class="card">
     <h1>Calepinage de modules</h1>
     <p>
-      Donne la longueur du mur et les largeurs de modules (en mm).<br>
-      L’appli calcule la <strong>tolérance minimale</strong>, la combinaison de modules la plus compacte,  
-      et t’affiche un <strong>rendu visuel 1D</strong>, une <strong>graduation du mur</strong>,  
-      et une <strong>vue 2D du meuble</strong> (si tu donnes la hauteur).
+      La longueur totale des modules est <strong>toujours ≤ longueur du mur</strong>.<br>
+      Tu peux ensuite <strong>réordonner les modules</strong> visuellement (drag & drop) pour travailler le design,
+      et voir la <strong>vue 2D du meuble</strong>.
     </p>
   </div>
 
@@ -296,7 +299,7 @@
       L’algorithme s’adapte et propose la meilleure combinaison possible.
     </p>
 
-    <label for="targetTol">Tolérance cible max (± mm, optionnelle)</label>
+    <label for="targetTol">Tolérance cible max (jeu résiduel, ± mm, optionnelle)</label>
     <input id="targetTol" type="number" min="0" step="1" placeholder="ex : 20">
 
     <button id="computeBtn">Calculer la combinaison optimale</button>
@@ -310,6 +313,10 @@
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 
   <script>
+    // --- ÉTAT GLOBAL ---
+    let currentResult = null;          // Résultat numérique (combinaison)
+    let currentLayoutModules = [];     // Liste ordonnée de modules {width, index}
+
     // ----- UTILITAIRE GCD -----
     function gcd(a, b) {
       a = Math.abs(a);
@@ -341,27 +348,24 @@
       return unique;
     }
 
-    // ----- CALCUL COMBINAISON OPTIMALE -----
+    // ----- CALCUL COMBINAISON OPTIMALE (SANS DÉPASSER LE MUR) -----
     function computeBestCombination(wallLength, moduleWidths) {
       if (wallLength <= 0 || moduleWidths.length === 0) return null;
 
       const step = gcdArray(moduleWidths);
       const widthsUnits = moduleWidths.map(w => w / step);
 
-      const wallUnitsFloat = wallLength / step;
-      const maxWidth = Math.max(...moduleWidths);
+      const wallUnits = Math.floor(wallLength / step);
+      if (wallUnits <= 0) return null;
 
-      const maxUnits = Math.round(wallUnitsFloat + (2 * maxWidth) / step);
-      if (maxUnits <= 0) return null;
-
-      const dp = new Array(maxUnits + 1).fill(null);
+      const dp = new Array(wallUnits + 1).fill(null);
       dp[0] = {
         count: 0,
         counts: new Array(moduleWidths.length).fill(0),
         totalUnits: 0
       };
 
-      for (let i = 1; i <= maxUnits; i++) {
+      for (let i = 1; i <= wallUnits; i++) {
         let best = null;
         for (let j = 0; j < widthsUnits.length; j++) {
           const w = widthsUnits[j];
@@ -384,29 +388,44 @@
         dp[i] = best;
       }
 
+      // On cherche la longueur <= mur la plus grande (donc jeu minimal)
       let bestSolution = null;
-      let bestDiffAbs = Infinity;
+      let bestGap = Infinity; // gap = mur - longueur modules
 
-      for (let i = 1; i <= maxUnits; i++) {
+      for (let i = 1; i <= wallUnits; i++) {
         const sol = dp[i];
         if (!sol) continue;
         const lenMm = sol.totalUnits * step;
-        const diff = lenMm - wallLength;
-        const diffAbs = Math.abs(diff);
+        if (lenMm > wallLength) continue; // sécurité (normalement inutile)
+        const gap = wallLength - lenMm; // >= 0
         if (
-          diffAbs < bestDiffAbs ||
-          (diffAbs === bestDiffAbs && sol.count < bestSolution.solution.count)
+          gap < bestGap ||
+          (gap === bestGap && sol.count < bestSolution.solution.count)
         ) {
-          bestDiffAbs = diffAbs;
+          bestGap = gap;
           bestSolution = {
             solution: sol,
-            diff,
-            totalLength: lenMm
+            totalLength: lenMm,
+            gap
           };
         }
       }
 
-      if (!bestSolution) return null;
+      if (!bestSolution) {
+        // Aucun module ne passe : soit mur trop petit, soit formats trop gros
+        return {
+          moduleWidths,
+          step,
+          wallLength,
+          solution: {
+            count: 0,
+            counts: new Array(moduleWidths.length).fill(0),
+            totalUnits: 0
+          },
+          totalLength: 0,
+          gap: wallLength
+        };
+      }
 
       return {
         moduleWidths,
@@ -416,35 +435,36 @@
       };
     }
 
-    // ----- VISUEL 1D DES MODULES -----
-    function buildVisualHtml(moduleWidths, counts, totalLength) {
-      const blocks = [];
-      moduleWidths.forEach((w, idx) => {
-        const q = counts[idx];
-        for (let k = 0; k < q; k++) {
-          blocks.push({ width: w, index: idx });
-        }
+    // ----- VISUEL 1D (DRAG & DROP) -----
+    function render1DBar(container, layoutModules, totalLength) {
+      container.innerHTML = "";
+
+      const wrapper = document.createElement("div");
+      wrapper.className = "visual-wrapper";
+
+      const bar = document.createElement("div");
+      bar.className = "visual-bar";
+      bar.id = "visual-bar-draggable";
+
+      layoutModules.forEach((mod, idx) => {
+        const div = document.createElement("div");
+        div.className = "module-block module-color-" + (mod.index % 7);
+        div.draggable = true;
+        div.dataset.idx = String(idx);
+        div.style.flexGrow = String(mod.width);
+        div.textContent = mod.width + " mm";
+        bar.appendChild(div);
       });
 
-      if (blocks.length === 0) return "";
+      const caption = document.createElement("div");
+      caption.className = "visual-caption";
+      caption.textContent =
+        "Vue en plan frontale : chaque rectangle = un module, la barre complète ≈ " +
+        totalLength.toFixed(0) + " mm.";
 
-      let html = '<div class="visual-wrapper">';
-      html += '<div class="visual-bar">';
-      blocks.forEach((block) => {
-        const flexGrow = block.width;
-        const cls = "module-block module-color-" + (block.index % 7);
-        html += `<div class="${cls}" style="flex-grow:${flexGrow};">
-                   <span>${block.width} mm</span>
-                 </div>`;
-      });
-      html += '</div>';
-      html += `<div class="visual-caption">
-                 Vue en plan frontale : chaque rectangle = un module, 
-                 la barre complète ≈ ${totalLength.toFixed(0)} mm.
-               </div>`;
-      html += '</div>';
-
-      return html;
+      wrapper.appendChild(bar);
+      wrapper.appendChild(caption);
+      container.appendChild(wrapper);
     }
 
     // ----- GRADUATION DU MUR -----
@@ -481,13 +501,14 @@
       return html;
     }
 
-    // ----- VUE 2D DU MEUBLE -----
-    function build2DViewHtml(moduleWidths, counts, wallLength, heightMm) {
+    // ----- VUE 2D DU MEUBLE (utilise l’ordre actuel des modules) -----
+    function build2DViewHtml(layoutModules, wallLength, heightMm) {
       if (!heightMm || heightMm <= 0) return "";
 
-      const totalModulesLength = moduleWidths.reduce((sum, w, i) => sum + w * counts[i], 0);
-      if (totalModulesLength <= 0) return "";
+      const totalLength = layoutModules.reduce((sum, m) => sum + m.width, 0);
+      if (totalLength <= 0) return "";
 
+      // Hauteur en pixels approx, limitée
       const targetWidthPx = 600;
       const scale = wallLength > 0 ? wallLength / targetWidthPx : 1;
       let heightPx = heightMm / (scale || 1);
@@ -495,55 +516,49 @@
         const factor = 350 / heightPx;
         heightPx *= factor;
       }
-      if (heightPx < 80) {
-        heightPx = 80;
-      }
+      if (heightPx < 80) heightPx = 80;
 
       let html = '<div class="view2d-wrapper">';
       html += '<div class="view2d-title">Vue 2D du meuble (élévation)</div>';
       html += `<div class="view2d-container" style="height:${heightPx}px;">`;
 
       let currentX = 0;
-      for (let i = 0; i < moduleWidths.length; i++) {
-        const w = moduleWidths[i];
-        const q = counts[i];
-        for (let k = 0; k < q; k++) {
-          const startX = currentX;
-          const endX = currentX + w;
-          const leftPct = (startX / totalModulesLength) * 100;
-          const widthPct = (w / totalModulesLength) * 100;
-          const clsColor = "module-color-" + (i % 7);
-
-          html += `<div class="view2d-module ${clsColor}" 
-                        style="left:${leftPct}%; width:${widthPct}%;">
-                     <span>${w} mm</span>
-                   </div>`;
-          currentX += w;
-        }
-      }
+      layoutModules.forEach((mod, idx) => {
+        const startX = currentX;
+        const width = mod.width;
+        const leftPct = (startX / totalLength) * 100;
+        const widthPct = (width / totalLength) * 100;
+        const clsColor = "module-color-" + (mod.index % 7);
+        html += `<div class="view2d-module ${clsColor}"
+                     style="left:${leftPct}%; width:${widthPct}%;">
+                   <span>${width} mm</span>
+                 </div>`;
+        currentX += width;
+      });
 
       html += '<div class="view2d-border"></div>';
       html += '</div>';
       html += `<div class="view2d-caption">
-                 Largeur totale meuble ≈ ${totalModulesLength.toFixed(0)} mm, 
-                 hauteur ${heightMm.toFixed(0)} mm (échelle approximative adaptée à l’écran).
+                 Largeur totale meuble ≈ ${totalLength.toFixed(0)} mm (≤ mur ${wallLength.toFixed(0)} mm),
+                 hauteur ${heightMm.toFixed(0)} mm (échelle adaptative).
                </div>`;
       html += '</div>';
 
       return html;
     }
 
+    // ----- FORMATAGE GLOBAL DU RÉSULTAT -----
     function formatResult(result, targetTol, heightMm) {
-      const { moduleWidths, wallLength, totalLength, diff, solution } = result;
+      const { moduleWidths, wallLength, totalLength, gap, solution } = result;
       const counts = solution.counts;
 
-      const tolMin = Math.round(Math.abs(diff));
+      const tolMin = Math.round(gap); // jeu résiduel (mur - meuble) >= 0
 
       let html = "";
       html += `<div class="result" id="result-content">`;
       html += `<p><strong>Longueur du mur :</strong> ${wallLength.toFixed(0)} mm</p>`;
-      html += `<p><strong>Longueur obtenue :</strong> ${totalLength.toFixed(0)} mm 
-                 <span class="tag">écart ${diff >= 0 ? "+" : ""}${diff.toFixed(0)} mm</span></p>`;
+      html += `<p><strong>Longueur totale des modules :</strong> ${totalLength.toFixed(0)} mm 
+                 <span class="tag">jeu résiduel ${tolMin} mm</span></p>`;
       html += `<p><strong>Tolérance minimale nécessaire :</strong> ±${tolMin} mm`;
 
       if (typeof targetTol === "number" && !isNaN(targetTol) && targetTol >= 0) {
@@ -559,12 +574,10 @@
 
       html += `<p><strong>Nombre total de modules :</strong> ${solution.count}</p>`;
 
-      // Visuel 1D
-      html += buildVisualHtml(moduleWidths, counts, totalLength);
-      // Graduation mur
-      html += buildScaleHtml(wallLength);
-      // Vue 2D (si hauteur fournie)
-      html += build2DViewHtml(moduleWidths, counts, wallLength, heightMm);
+      // Placeholders pour les visuels
+      html += `<div id="visual1d"></div>`;
+      html += `<div id="scale"></div>`;
+      html += `<div id="view2d"></div>`;
 
       // Tableau
       html += `<h3>Détail par format</h3>`;
@@ -586,46 +599,108 @@
       });
       html += `</tbody></table>`;
 
-      // Boutons d’export
+      // Bouton d’export
       html += `<div class="export-buttons">
                  <button type="button" id="exportPngBtn">Exporter le rendu en image (PNG)</button>
                </div>`;
 
       html += `<p style="font-size:0.9rem; color:#555;">
-                 Tu peux absorber cette tolérance avec les fileurs, le jeu latéral ou la position des caissons.<br>
-                 Pour améliorer la précision, essaie d’autres largeurs de modules ou réduis l’écart entre formats.
+                 Le meuble ne dépasse jamais le mur. Le jeu résiduel est à prendre dans les fileurs / joues / marges.<br>
+                 Tu peux réordonner les modules dans la barre du haut pour tester différentes compositions visuelles.
                </p>`;
 
       html += `</div>`;
       return html;
     }
 
-    // ----- EXPORT PNG -----
-    function setupExportButton() {
-      const btn = document.getElementById('exportPngBtn');
-      if (!btn || typeof html2canvas === "undefined") return;
+    // ----- RENDU DES VISUELS EN FONCTION DE currentLayoutModules -----
+    function renderVisuals() {
+      if (!currentResult) return;
+      const visual1dContainer = document.getElementById("visual1d");
+      const scaleContainer = document.getElementById("scale");
+      const view2dContainer = document.getElementById("view2d");
+      if (!visual1dContainer || !scaleContainer || !view2dContainer) return;
 
-      btn.addEventListener('click', () => {
-        const resultDiv = document.getElementById('result-content');
-        if (!resultDiv) return;
+      // 1D bar (drag & drop)
+      render1DBar(visual1dContainer, currentLayoutModules, currentResult.totalLength);
 
-        html2canvas(resultDiv, { scale: 2 }).then(canvas => {
-          const link = document.createElement('a');
-          link.download = 'calepinage.png';
-          link.href = canvas.toDataURL('image/png');
-          link.click();
-        });
+      // Graduation mur
+      scaleContainer.innerHTML = buildScaleHtml(currentResult.wallLength);
+
+      // Vue 2D
+      const heightInput = document.getElementById("heightInput");
+      const heightMm = parseFloat(heightInput.value);
+      const heightValue = isNaN(heightMm) ? null : heightMm;
+      view2dContainer.innerHTML = build2DViewHtml(currentLayoutModules, currentResult.wallLength, heightValue);
+
+      setupDragAndDrop();   // important : brancher DnD après rendu
+      setupExportButton();  // rebrancher l’export
+    }
+
+    // ----- DRAG & DROP SUR LA BARRE 1D -----
+    function setupDragAndDrop() {
+      const bar = document.getElementById("visual-bar-draggable");
+      if (!bar) return;
+
+      let dragIndex = null;
+
+      bar.addEventListener("dragstart", (e) => {
+        const block = e.target.closest(".module-block");
+        if (!block) return;
+        dragIndex = parseInt(block.dataset.idx, 10);
+        block.classList.add("dragging");
+        e.dataTransfer.effectAllowed = "move";
+      });
+
+      bar.addEventListener("dragend", (e) => {
+        const block = e.target.closest(".module-block");
+        if (block) block.classList.remove("dragging");
+      });
+
+      bar.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "move";
+      });
+
+      bar.addEventListener("drop", (e) => {
+        e.preventDefault();
+        const targetBlock = e.target.closest(".module-block");
+        if (!targetBlock || dragIndex === null) return;
+        const targetIndex = parseInt(targetBlock.dataset.idx, 10);
+        if (isNaN(targetIndex)) return;
+
+        const item = currentLayoutModules.splice(dragIndex, 1)[0];
+        currentLayoutModules.splice(targetIndex, 0, item);
+
+        // Re-render pour refléter le nouvel ordre
+        renderVisuals();
       });
     }
 
-    // ----- UI -----
-    document.getElementById('computeBtn').addEventListener('click', () => {
-      const wallInput = document.getElementById('wallLength');
-      const modulesInput = document.getElementById('modulesInput');
-      const targetTolInput = document.getElementById('targetTol');
-      const heightInput = document.getElementById('heightInput');
-      const outDiv = document.getElementById('output');
-      const errDiv = document.getElementById('error');
+    // ----- EXPORT PNG -----
+    function setupExportButton() {
+      const btn = document.getElementById("exportPngBtn");
+      if (!btn || typeof html2canvas === "undefined") return;
+
+      btn.onclick = () => {
+        const resultDiv = document.getElementById("result-content");
+        if (!resultDiv) return;
+        html2canvas(resultDiv, { scale: 2 }).then((canvas) => {
+          const link = document.createElement("a");
+          link.download = "calepinage.png";
+          link.href = canvas.toDataURL("image/png");
+          link.click();
+        });
+      };
+    }
+
+    // ----- UI PRINCIPALE -----
+    document.getElementById("computeBtn").addEventListener("click", () => {
+      const wallInput = document.getElementById("wallLength");
+      const modulesInput = document.getElementById("modulesInput");
+      const targetTolInput = document.getElementById("targetTol");
+      const outDiv = document.getElementById("output");
+      const errDiv = document.getElementById("error");
 
       errDiv.textContent = "";
       outDiv.style.display = "none";
@@ -649,25 +724,32 @@
         return;
       }
 
+      currentResult = result;
+
+      // Construire la liste ordonnée de modules (multiset à plat)
+      currentLayoutModules = [];
+      result.moduleWidths.forEach((w, idx) => {
+        const q = result.solution.counts[idx];
+        for (let k = 0; k < q; k++) {
+          currentLayoutModules.push({ width: w, index: idx });
+        }
+      });
+
       const targetTol = parseFloat(targetTolInput.value);
       const targetTolValue = isNaN(targetTol) ? null : targetTol;
 
-      const heightMm = parseFloat(heightInput.value);
-      const heightValue = isNaN(heightMm) ? null : heightMm;
-
-      outDiv.innerHTML = formatResult(result, targetTolValue, heightValue);
+      outDiv.innerHTML = formatResult(result, targetTolValue);
       outDiv.style.display = "block";
 
-      // brancher le bouton d’export une fois le DOM injecté
-      setupExportButton();
+      renderVisuals();
     });
 
     // ----- BOUTONS PRESETS -----
-    const modulesInputEl = document.getElementById('modulesInput');
-    document.getElementById('presetStd').addEventListener('click', () => {
+    const modulesInputEl = document.getElementById("modulesInput");
+    document.getElementById("presetStd").addEventListener("click", () => {
       modulesInputEl.value = "200, 240, 320, 480, 640, 960, 1280";
     });
-    document.getElementById('preset300').addEventListener('click', () => {
+    document.getElementById("preset300").addEventListener("click", () => {
       modulesInputEl.value = "300, 450, 600, 900, 1200";
     });
 
