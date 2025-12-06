@@ -6,7 +6,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#f5f5f5">
   <link rel="manifest" href="manifest.webmanifest">
-  <!-- Icône de base pour les onglets -->
   <link rel="icon" href="icon-192.png">
   <style>
     body {
@@ -33,13 +32,18 @@
       margin-top: 1rem;
       font-weight: 600;
     }
-    input {
+    input, textarea {
       margin-top: 0.25rem;
       padding: 0.4rem 0.6rem;
       font-size: 1rem;
       width: 100%;
-      max-width: 220px;
+      max-width: 320px;
       box-sizing: border-box;
+      font-family: inherit;
+    }
+    textarea {
+      min-height: 3.5rem;
+      resize: vertical;
     }
     button {
       margin-top: 1.5rem;
@@ -91,15 +95,24 @@
       margin-left: 0.25rem;
       background: #fafafa;
     }
+    .tag-ok {
+      border-color: #3a9b4b;
+      color: #2f7b3b;
+      background: #e7f7ea;
+    }
+    .tag-warn {
+      border-color: #b37a00;
+      color: #8a5f00;
+      background: #fff4d7;
+    }
   </style>
 </head>
 <body>
   <div class="card">
     <h1>Calepinage de modules</h1>
     <p>
-      Largeurs disponibles (mm) :
-      <strong>200, 240, 320, 480, 640, 960, 1280</strong><br>
-      Tolérance par défaut : ±20 mm (absorbé par fileurs / jeu).
+      Donne la longueur du mur et les largeurs de modules (en mm).<br>
+      L’appli calcule la <strong>tolérance minimale</strong> et la combinaison de modules la plus compacte.
     </p>
   </div>
 
@@ -109,10 +122,14 @@
     <label for="wallLength">Longueur du mur (en mm)</label>
     <input id="wallLength" type="number" min="1" step="1" placeholder="ex : 3470">
 
-    <label for="tolerance">Tolérance (± mm)</label>
-    <input id="tolerance" type="number" min="0" step="1" value="20">
+    <label for="modulesInput">Largeurs de modules (en mm, séparées par des virgules)</label>
+    <textarea id="modulesInput">200, 240, 320, 480, 640, 960, 1280</textarea>
+    <p style="font-size:0.9rem; color:#555;">
+      Tu peux mettre d’autres formats, par ex : <em>300, 450, 600, 900, 1200</em>.  
+      L’algorithme s’adapte et propose la meilleure combinaison possible.
+    </p>
 
-    <button id="computeBtn">Calculer la combinaison</button>
+    <button id="computeBtn">Calculer la combinaison optimale</button>
 
     <div id="error" class="error"></div>
   </div>
@@ -120,75 +137,60 @@
   <div id="output" class="card" style="display:none;"></div>
 
   <script>
-    // ----- CONFIG MODULES -----
-    // Tu peux changer les noms (name) si tu veux avoir "Box S", "Box M", etc.
-    const STEP = 40; // pas en mm
-    const MODULES = [
-      { name: "Module XS", width: 200 },
-      { name: "Module S",  width: 240 },
-      { name: "Module M",  width: 320 },
-      { name: "Module L",  width: 480 },
-      { name: "Module XL", width: 640 },
-      { name: "Module XXL",width: 960 },
-      { name: "Module XXXL",width:1280 }
-    ];
-
-    const WIDTHS_MM   = MODULES.map(m => m.width);
-    const WIDTHS_UNITS = WIDTHS_MM.map(w => w / STEP); // en unités de 40 mm
-
-    // ----- LOGIQUE DE CALCUL -----
-    function computeCombination(wallLength, tolerance) {
-      if (wallLength <= 0) return null;
-
-      const nApprox = wallLength / STEP;
-      const tolUnits = Math.round(tolerance / STEP);
-
-      const candidates = [];
-      const nFloor = Math.floor(nApprox);
-      const nCeil = Math.ceil(nApprox);
-
-      const targets = new Set();
-      for (let n = nFloor - tolUnits; n <= nCeil + tolUnits; n++) {
-        if (n > 0) targets.add(n);
+    // ----- UTILITAIRE GCD -----
+    function gcd(a, b) {
+      a = Math.abs(a);
+      b = Math.abs(b);
+      while (b !== 0) {
+        const t = b;
+        b = a % b;
+        a = t;
       }
-
-      for (const target of targets) {
-        const solution = unboundedCoinChange(WIDTHS_UNITS, target);
-        if (solution) {
-          const totalUnits = solution.totalUnits;
-          const totalLength = totalUnits * STEP;
-          const diff = totalLength - wallLength;
-          if (Math.abs(diff) <= tolerance) {
-            candidates.push({
-              solution,
-              totalLength,
-              diff,
-              target
-            });
-          }
-        }
-      }
-
-      if (candidates.length === 0) return null;
-
-      // On prend la solution la plus proche, puis la plus compacte
-      candidates.sort((a, b) => {
-        const diffA = Math.abs(a.diff);
-        const diffB = Math.abs(b.diff);
-        if (diffA !== diffB) return diffA - diffB;
-        return a.solution.count - b.solution.count;
-      });
-
-      return candidates[0];
+      return a;
     }
 
-    // Problème de rendu de monnaie non borné : on minimise le nombre total de modules
-    function unboundedCoinChange(widthsUnits, targetUnits) {
-      const maxUnits = targetUnits;
-      const dp = Array(maxUnits + 1).fill(null);
+    function gcdArray(arr) {
+      return arr.reduce((g, x) => gcd(g, x), arr[0]);
+    }
+
+    // ----- PARSE DES MODULES -----
+    function parseModules(text) {
+      const parts = text.split(/[,; ]+/).filter(Boolean);
+      const widths = [];
+      for (const p of parts) {
+        const v = parseInt(p, 10);
+        if (isNaN(v) || v <= 0) {
+          return null;
+        }
+        widths.push(v);
+      }
+      // On enlève les doublons
+      const unique = Array.from(new Set(widths)).sort((a, b) => a - b);
+      return unique;
+    }
+
+    // ----- CALCUL COMBINAISON OPTIMALE -----
+    function computeBestCombination(wallLength, moduleWidths) {
+      if (wallLength <= 0 || moduleWidths.length === 0) return null;
+
+      // On calcule un pas qui divise toutes les largeurs (gcd),
+      // pour travailler en "unités" et simplifier le DP.
+      const step = gcdArray(moduleWidths);
+      const widthsUnits = moduleWidths.map(w => w / step);
+
+      const wallUnitsFloat = wallLength / step;
+      const maxWidth = Math.max(...moduleWidths);
+
+      // On calcule jusqu’à wall + 2 * plus grand module (en unités)
+      const maxUnits = Math.round(wallUnitsFloat + (2 * maxWidth) / step);
+      if (maxUnits <= 0) return null;
+
+      // DP : dp[i] = meilleure solution pour atteindre exactement i unités
+      // solution = { count, counts[], totalUnits }
+      const dp = new Array(maxUnits + 1).fill(null);
       dp[0] = {
         count: 0,
-        counts: Array(widthsUnits.length).fill(0),
+        counts: new Array(moduleWidths.length).fill(0),
         totalUnits: 0
       };
 
@@ -215,49 +217,93 @@
         dp[i] = best;
       }
 
-      return dp[targetUnits] || null;
+      // On cherche la longueur réalisable la plus proche du mur
+      let bestSolution = null;
+      let bestDiffAbs = Infinity;
+
+      for (let i = 1; i <= maxUnits; i++) {
+        const sol = dp[i];
+        if (!sol) continue;
+        const lenMm = sol.totalUnits * step;
+        const diff = lenMm - wallLength;
+        const diffAbs = Math.abs(diff);
+        if (
+          diffAbs < bestDiffAbs ||
+          (diffAbs === bestDiffAbs && sol.count < bestSolution.solution.count)
+        ) {
+          bestDiffAbs = diffAbs;
+          bestSolution = {
+            solution: sol,
+            diff,
+            totalLength: lenMm
+          };
+        }
+      }
+
+      if (!bestSolution) return null;
+
+      return {
+        moduleWidths,
+        step,
+        wallLength,
+        ...bestSolution
+      };
     }
 
-    function formatResult(wallLength, tolerance, result) {
-      const { solution, totalLength, diff } = result;
+    function formatResult(result) {
+      const { moduleWidths, wallLength, totalLength, diff, solution } = result;
       const counts = solution.counts;
+
+      const tolMin = Math.round(Math.abs(diff)); // tolérance minimale en mm
 
       let html = "";
       html += `<div class="result">`;
       html += `<p><strong>Longueur du mur :</strong> ${wallLength.toFixed(0)} mm</p>`;
       html += `<p><strong>Longueur obtenue :</strong> ${totalLength.toFixed(0)} mm 
                  <span class="tag">écart ${diff >= 0 ? "+" : ""}${diff.toFixed(0)} mm</span></p>`;
+      html += `<p><strong>Tolérance minimale nécessaire :</strong> ±${tolMin} mm`;
+
+      if (tolMin <= 20) {
+        html += ` <span class="tag tag-ok">OK pour ton objectif ±20 mm</span>`;
+      } else {
+        html += ` <span class="tag tag-warn">> 20 mm, revoir les formats si tu veux plus serré</span>`;
+      }
+      html += `</p>`;
+
       html += `<p><strong>Nombre total de modules :</strong> ${solution.count}</p>`;
 
+      html += `<h3>Détail par format</h3>`;
       html += `<table><thead><tr>
-               <th style="text-align:left;">Module</th>
-               <th>Largeur (mm)</th>
+               <th style="text-align:left;">Largeur (mm)</th>
                <th>Qté</th>
                <th>Total (mm)</th>
                </tr></thead><tbody>`;
-      MODULES.forEach((m, idx) => {
+
+      moduleWidths.forEach((w, idx) => {
         const q = counts[idx];
         if (q > 0) {
           html += `<tr>
-                     <td style="text-align:left;">${m.name}</td>
-                     <td>${m.width}</td>
+                     <td style="text-align:left;">${w}</td>
                      <td>${q}</td>
-                     <td>${q * m.width}</td>
+                     <td>${q * w}</td>
                    </tr>`;
         }
       });
       html += `</tbody></table>`;
 
-      html += `<p>Tu peux absorber les ±${tolerance} mm avec les fileurs, le jeu latéral ou la position des caissons.</p>`;
-      html += `</div>`;
+      html += `<p style="font-size:0.9rem; color:#555;">
+                 Tu peux absorber cette tolérance avec les fileurs, le jeu latéral ou la position des caissons.<br>
+                 Pour améliorer la précision, essaie d’autres largeurs de modules et compare la tolérance minimale.
+               </p>`;
 
+      html += `</div>`;
       return html;
     }
 
     // ----- UI -----
     document.getElementById('computeBtn').addEventListener('click', () => {
       const wallInput = document.getElementById('wallLength');
-      const tolInput = document.getElementById('tolerance');
+      const modulesInput = document.getElementById('modulesInput');
       const outDiv = document.getElementById('output');
       const errDiv = document.getElementById('error');
 
@@ -266,28 +312,28 @@
       outDiv.innerHTML = "";
 
       const wallLength = parseFloat(wallInput.value);
-      const tolerance = parseFloat(tolInput.value);
-
       if (isNaN(wallLength) || wallLength <= 0) {
         errDiv.textContent = "Merci d’indiquer une longueur de mur valide (en mm).";
         return;
       }
-      if (isNaN(tolerance) || tolerance < 0) {
-        errDiv.textContent = "Merci d’indiquer une tolérance valide (en mm).";
+
+      const moduleWidths = parseModules(modulesInput.value);
+      if (!moduleWidths || moduleWidths.length === 0) {
+        errDiv.textContent = "Merci d’indiquer au moins une largeur de module valide (en mm).";
         return;
       }
 
-      const result = computeCombination(wallLength, tolerance);
+      const result = computeBestCombination(wallLength, moduleWidths);
       if (!result) {
-        errDiv.textContent = "Aucune combinaison trouvée dans la tolérance demandée. Essaie d’augmenter légèrement la tolérance.";
+        errDiv.textContent = "Aucune combinaison trouvée. Essaie d’ajouter des largeurs ou d’élargir la gamme.";
         return;
       }
 
-      outDiv.innerHTML = formatResult(wallLength, tolerance, result);
+      outDiv.innerHTML = formatResult(result);
       outDiv.style.display = "block";
     });
 
-    // ----- ENREGISTREMENT SERVICE WORKER -----
+    // ----- SERVICE WORKER -----
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", () => {
         navigator.serviceWorker.register("service-worker.js")
