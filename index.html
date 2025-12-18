@@ -2,117 +2,95 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <title>Calepinage de modules</title>
+  <title>Calepinage & meuble modulaire</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#f5f5f5">
-  <link rel="manifest" href="manifest.webmanifest">
-  <link rel="icon" href="icon-192.png">
   <link rel="stylesheet" href="style.css">
 </head>
+
 <body>
   <div class="card">
-    <h1>Calepinage de modules</h1>
-    <p>
-      La somme des modules est toujours <strong>≤ longueur du mur</strong>.<br>
-      Les modules ont une <strong>hauteur max de 320 mm</strong> : on compose le meuble
-      en <strong>plusieurs étages</strong> (160, 320, etc.) pour approcher au mieux la hauteur demandée.<br>
-      Tu peux définir une <strong>plinthe/fileur bas</strong> et un <strong>top technique</strong>,
-      puis laisser l’appli proposer une hauteur optimisée du corps du meuble.<br>
-      Tu peux <strong>réordonner</strong> les modules (drag & drop),
-      <strong>ajouter / supprimer</strong des modules par format, et
-      <strong>sauvegarder / recharger</strong un projet.
+    <h1>Calepinage & meuble modulaire</h1>
+    <p class="hint">
+      - Ne dépasse jamais la longueur du mur<br>
+      - Vue 1D / 2D / Vue éclatée<br>
+      - Export PNG + PDF multi-pages<br>
+      - Cut-list atelier (panneaux)<br>
+      - Sauvegarde locale (projets)
     </p>
   </div>
 
   <div class="card">
     <h2>Paramètres</h2>
 
-    <label for="wallLength">Longueur du mur (en mm)</label>
-    <input id="wallLength" type="number" min="1" step="1" placeholder="ex : 3470">
+    <label for="wallLength">Longueur du mur (mm)</label>
+    <input id="wallLength" type="number" min="1" step="1" placeholder="ex : 3520">
 
-    <label for="heightInput">Hauteur totale cible du meuble (en mm)</label>
+    <label for="heightInput">Hauteur totale cible (mm)</label>
     <input id="heightInput" type="number" min="1" step="1" placeholder="ex : 950">
 
-    <label for="plinthInput">Hauteur plinthe / fileur bas (en mm, optionnelle)</label>
-    <input id="plinthInput" type="number" min="0" step="1" placeholder="ex : 80">
+    <label for="plinthInput">Plinthe / fileur bas (mm)</label>
+    <input id="plinthInput" type="number" min="0" step="1" value="80">
 
-    <label for="topInput">Hauteur top technique (en mm, optionnelle)</label>
-    <input id="topInput" type="number" min="0" step="1" placeholder="ex : 60">
+    <label for="topInput">Fileur haut (mm)</label>
+    <input id="topInput" type="number" min="0" step="1" value="60">
 
-    <label for="vertModulesInput">Hauteurs possibles des étages (≤ 320 mm, séparées par des virgules)</label>
-    <textarea id="vertModulesInput">320</textarea>
-    <p class="hint">
-      Par ex. <em>160, 320</em> pour faire des étages de 160 et 320 mm.<br>
-      L’algorithme choisit une combinaison d’étages pour le <strong>corps du meuble</strong> (entre plinthe et top)
-      qui ne dépasse pas la hauteur disponible et minimise l’écart.
-    </p>
+    <h2>Atelier</h2>
 
-    <label for="modulesInput">Largeurs de modules (en mm, séparées par des virgules)</label>
-    <textarea id="modulesInput">200, 240, 320, 480, 640, 960, 1280</textarea>
+    <label for="depthInput">Profondeur caisson (mm)</label>
+    <input id="depthInput" type="number" min="50" step="1" value="400">
 
-    <div class="preset-buttons">
-      <p class="preset-label">
-        Presets de formats :
-      </p>
-      <button type="button" id="presetStd">Standard 200–1280</button>
-      <button type="button" id="preset300">Gamme 300 / 450 / 600 / 900 / 1200</button>
+    <label for="matThkInput">Épaisseur matériau (mm)</label>
+    <input id="matThkInput" type="number" min="1" step="1" value="19">
+
+    <label for="backThkInput">Épaisseur fond (mm)</label>
+    <input id="backThkInput" type="number" min="0" step="1" value="8">
+
+    <div class="row-check">
+      <input id="includeBackInput" type="checkbox" checked>
+      <label for="includeBackInput" class="inline-label">Inclure un fond pour chaque caisson</label>
     </div>
 
-    <p class="hint">
-      Tu peux mettre d’autres formats, par ex : <em>300, 450, 600, 900, 1200</em>.<br>
-      L’algorithme propose une combinaison initiale optimale sans dépasser le mur.
-    </p>
+    <label for="vertModulesInput">Hauteurs d’étages possibles (≤ 320 mm)</label>
+    <textarea id="vertModulesInput">160, 162, 164, 166, 168, 170, 172, 174, 176, 178, 180, 200, 240, 280, 320</textarea>
 
-    <label for="targetTol">Tolérance cible max (jeu résiduel horizontal, ± mm, optionnelle)</label>
-    <input id="targetTol" type="number" min="0" step="1" placeholder="ex : 20">
+    <label for="modulesInput">Largeurs de modules possibles (mm)</label>
+    <textarea id="modulesInput">200, 202, 204, 206, 208, 210, 280, 320, 360, 400, 480, 560, 640, 720, 800</textarea>
 
-    <button id="computeBtn">Calculer la combinaison optimale</button>
-<h2>Mesures chantier</h2>
+    <label for="targetTol">Tolérance cible max (jeu horizontal, mm, option)</label>
+    <input id="targetTol" type="number" min="0" step="1" placeholder="ex : 2">
 
-<label>Largeur mur (bas / haut) en mm</label>
-<div class="row2">
-  <input id="wallBottom" type="number" placeholder="Bas ex : 3524">
-  <input id="wallTop" type="number" placeholder="Haut ex : 3518">
-</div>
+    <div class="btnrow">
+      <button id="computeBtn">Calculer</button>
+      <button id="presetMassifBtn" type="button">Preset bois massif (2 mm)</button>
+    </div>
 
-<label>Hauteur mur (gauche / droite) en mm</label>
-<div class="row2">
-  <input id="heightLeft" type="number" placeholder="Gauche ex : 2482">
-  <input id="heightRight" type="number" placeholder="Droite ex : 2474">
-</div>
-
-<h2>Zones de rattrapage</h2>
-
-<label>Fileur gauche (min / max mm)</label>
-<div class="row2">
-  <input id="fillerLeftMin" value="10">
-  <input id="fillerLeftMax" value="40">
-</div>
-
-<label>Fileur droit (min / max mm)</label>
-<div class="row2">
-  <input id="fillerRightMin" value="10">
-  <input id="fillerRightMax" value="40">
-</div>
-
-<label>Plinthe (min / max mm)</label>
-<div class="row2">
-  <input id="plinthMin" value="60">
-  <input id="plinthMax" value="120">
-</div>
-
-<label>Fileur haut (min / max mm)</label>
-<div class="row2">
-  <input id="topMin" value="40">
-  <input id="topMax" value="100">
-</div>
     <div id="error" class="error"></div>
+  </div>
+
+  <div class="card">
+    <h2>Sauvegardes</h2>
+    <label for="projectName">Nom du projet</label>
+    <input id="projectName" type="text" placeholder="ex : Buffet salon - Mur Nord">
+
+    <div class="btnrow">
+      <button id="saveProjectBtn" type="button">Sauvegarder</button>
+      <button id="exportJsonBtn" type="button">Exporter JSON</button>
+      <button id="importJsonBtn" type="button">Importer JSON</button>
+      <input id="importJsonFile" type="file" accept=".json" style="display:none;">
+    </div>
+
+    <div id="projectsList" class="projects"></div>
   </div>
 
   <div id="output" class="card" style="display:none;"></div>
 
-  <!-- html2canvas pour export PNG -->
+  <!-- Dépendances -->
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
-  <script src="app.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+
+  <!-- App -->
+  <script src="js/solver.js"></script>
+  <script src="js/render.js"></script>
+  <script src="js/main.js"></script>
 </body>
 </html>
