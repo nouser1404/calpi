@@ -49,6 +49,16 @@
       <input id="includeBackInput" type="checkbox" checked>
       <label for="includeBackInput" class="inline-label">Inclure un fond pour chaque caisson</label>
     </div>
+    <label for="assemblyMode">Mode d’assemblage</label>
+<select id="assemblyMode">
+  <option value="independent" selected>Assemblage par angles (caissons indépendants)</option>
+  <option value="shared">Panneaux partagés (cloisons communes)</option>
+</select>
+
+<label for="cornerAllowance">Surcote usinage angles (mm)</label>
+<input id="cornerAllowance" type="number" min="0" step="0.5" value="0">
+<p class="hint">Si ta queue d’aronde “mange” un peu de matière ou impose une reprise, mets une surcote (ex: 1–2 mm) puis tu affleures.</p>
+
 
     <label for="vertModulesInput">Hauteurs d’étages possibles (≤ 320 mm)</label>
     <textarea id="vertModulesInput">160, 162, 164, 166, 168, 170, 172, 174, 176, 178, 180, 200, 240, 280, 320</textarea>
