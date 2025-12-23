@@ -32,6 +32,10 @@ function readInputs() {
   const wallLength = parseFloat($("wallLength").value);
   const heightTotal = parseFloat($("heightInput").value);
 
+  const assemblyMode = $("assemblyMode").value; // 'independent' | 'shared'
+  const cornerAllowance = parseFloat($("cornerAllowance").value) || 0;
+
+
   const plinthMm = parseFloat($("plinthInput").value) || 0;
   const topMm = parseFloat($("topInput").value) || 0;
 
@@ -104,8 +108,11 @@ function computeAll() {
     depthMm: inputs.depthMm,
     matThk: inputs.matThk,
     backThk: inputs.backThk,
-    includeBack: inputs.includeBack
+    includeBack: inputs.includeBack,
+    assemblyMode: inputs.assemblyMode,
+    cornerAllowance: inputs.cornerAllowance
   });
+  
 
   renderAll();
   return true;
@@ -311,40 +318,66 @@ async function exportPDFMulti(inputs) {
      on le fera ensuite (mais là c’est exploitable immédiatement).
 */
 
-function buildCutList({ layoutModules, verticalInfo, depthMm, matThk, backThk, includeBack }) {
+function buildCutList({ layoutModules, verticalInfo, depthMm, matThk, backThk, includeBack, assemblyMode, cornerAllowance }) {
   const rows = [];
   if (!verticalInfo || !verticalInfo.rowHeights) return rows;
 
   const rowHeights = verticalInfo.rowHeights;
+  const R = rowHeights.length;
+  const N = layoutModules.length;
+  if (N === 0 || R === 0) return rows;
 
-  // agrégation par type de pièce
-  // key: part|len|wid|thk
   const map = new Map();
-
   function add(part, len, wid, thk, qty) {
     const key = `${part}|${len}|${wid}|${thk}`;
     map.set(key, (map.get(key) || 0) + qty);
   }
 
-  for (const h of rowHeights) {
-    for (const mod of layoutModules) {
+  // Surcote : si tu veux laisser un peu de marge à l’usinage d’angle
+  // (tu peux aussi la mettre à 0 si tu préfères du net net).
+  const A = Math.max(0, cornerAllowance || 0);
+
+  if (assemblyMode === "shared") {
+    // MODE PANNEAUX PARTAGÉS (cloisons communes)
+    for (const h of rowHeights) {
+      add("Joue extrême", h, depthMm, matThk, 2);
+      if (N > 1) add("Cloison intermédiaire", h, depthMm, matThk, N - 1);
+    }
+
+    // Plateaux partagés entre étages (alignés)
+    layoutModules.forEach((mod) => {
       const w = mod.width;
+      add("Dessous (base)", w, depthMm, matThk, 1);
+      if (R > 1) add("Plateau intermédiaire", w, depthMm, matThk, R - 1);
+      add("Dessus (top)", w, depthMm, matThk, 1);
+    });
 
-      // 2 côtés
-      add("Côté", h, depthMm, matThk, 2);
+  } else {
+    // MODE ANGLES (CAISSONS INDÉPENDANTS)
+    for (const h of rowHeights) {
+      for (const mod of layoutModules) {
+        const w = mod.width;
 
-      // dessus + dessous
-      add("Dessus", w, depthMm, matThk, 1);
-      add("Dessous", w, depthMm, matThk, 1);
+        // Côtés (2)
+        add("Côté", h + A, depthMm + A, matThk, 2);
 
-      // fond
-      if (includeBack && backThk > 0) {
-        add("Fond", w, h, backThk, 1);
+        // Dessus + dessous (1 chacun)
+        add("Dessus", w + A, depthMm + A, matThk, 1);
+        add("Dessous", w + A, depthMm + A, matThk, 1);
       }
     }
   }
 
-  // Conversion en tableau trié
+  // Fonds : toujours 1 par caisson et par étage (dans les 2 modes)
+  if (includeBack && backThk > 0) {
+    for (const h of rowHeights) {
+      for (const mod of layoutModules) {
+        add("Fond", mod.width, h, backThk, 1);
+      }
+    }
+  }
+
+  // Map -> array
   for (const [key, qty] of map.entries()) {
     const [part, len, wid, thk] = key.split("|");
     rows.push({ part, len: Number(len), wid: Number(wid), thk: Number(thk), qty });
@@ -352,13 +385,14 @@ function buildCutList({ layoutModules, verticalInfo, depthMm, matThk, backThk, i
 
   rows.sort((a, b) =>
     a.part.localeCompare(b.part) ||
+    a.thk - b.thk ||
     a.len - b.len ||
-    a.wid - b.wid ||
-    a.thk - b.thk
+    a.wid - b.wid
   );
 
   return rows;
 }
+
 
 /* =========================
    Sauvegardes (localStorage)
