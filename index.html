@@ -10,71 +10,104 @@
 <body>
   <div class="card">
     <h1>Calepinage & meuble modulaire</h1>
-    <p class="hint">
-      - Ne dépasse jamais la longueur du mur<br>
-      - Vue 1D / 2D / Vue éclatée<br>
-      - Export PNG + PDF multi-pages<br>
-      - Cut-list atelier (panneaux)<br>
-      - Sauvegarde locale (projets)
-    </p>
+    <p class="hint">Renseigne tes cotes, choisis des largeurs/hauteurs de modules, puis lance le calcul.</p>
+    <ul class="hint">
+      <li>Ne dépasse jamais la longueur du mur</li>
+      <li>Vue 1D / 2D / Vue éclatée</li>
+      <li>Export PNG + PDF multi-pages</li>
+      <li>Cut-list atelier (panneaux)</li>
+      <li>Sauvegarde locale (projets)</li>
+    </ul>
   </div>
 
   <div class="card">
+    <form id="paramsForm" autocomplete="off">
     <h2>Paramètres</h2>
 
-    <label for="wallLength">Longueur du mur (mm)</label>
-    <input id="wallLength" type="number" min="1" step="1" placeholder="ex : 3520">
+    <fieldset class="group">
+      <legend>Mur & hauteur</legend>
 
-    <label for="heightInput">Hauteur totale cible (mm)</label>
-    <input id="heightInput" type="number" min="1" step="1" placeholder="ex : 950">
+      <label for="wallLength">Longueur du mur (mm)</label>
+      <input id="wallLength" type="number" min="1" step="1" inputmode="numeric" placeholder="ex : 3520" autofocus required>
+      <p class="hint" id="wallLengthHint">Astuce : mesure à plusieurs endroits et garde la cote la plus petite.</p>
 
-    <label for="plinthInput">Plinthe / fileur bas (mm)</label>
-    <input id="plinthInput" type="number" min="0" step="1" value="80">
+      <label for="heightInput">Hauteur totale cible (mm)</label>
+      <input id="heightInput" type="number" min="1" step="1" inputmode="numeric" placeholder="ex : 950" required>
 
-    <label for="topInput">Fileur haut (mm)</label>
-    <input id="topInput" type="number" min="0" step="1" value="60">
+      <div class="row-2">
+        <div>
+          <label for="plinthInput">Plinthe / fileur bas (mm)</label>
+          <input id="plinthInput" type="number" min="0" step="1" inputmode="numeric" value="80">
+        </div>
+        <div>
+          <label for="topInput">Fileur haut (mm)</label>
+          <input id="topInput" type="number" min="0" step="1" inputmode="numeric" value="60">
+        </div>
+      </div>
+    </fieldset>
 
-    <h2>Atelier</h2>
+    <fieldset class="group">
+      <legend>Atelier</legend>
 
-    <label for="depthInput">Profondeur caisson (mm)</label>
-    <input id="depthInput" type="number" min="50" step="1" value="400">
+      <div class="row-2">
+        <div>
+          <label for="depthInput">Profondeur caisson (mm)</label>
+          <input id="depthInput" type="number" min="50" step="1" inputmode="numeric" value="400">
+        </div>
+        <div>
+          <label for="matThkInput">Épaisseur matériau (mm)</label>
+          <input id="matThkInput" type="number" min="1" step="1" inputmode="numeric" value="19">
+        </div>
+      </div>
 
-    <label for="matThkInput">Épaisseur matériau (mm)</label>
-    <input id="matThkInput" type="number" min="1" step="1" value="19">
+      <div class="row-2">
+        <div>
+          <label for="backThkInput">Épaisseur fond (mm)</label>
+          <input id="backThkInput" type="number" min="0" step="1" inputmode="numeric" value="8">
+        </div>
+        <div class="row-check" style="align-items:flex-end;">
+          <input id="includeBackInput" type="checkbox" checked>
+          <label for="includeBackInput" class="inline-label">Inclure un fond pour chaque caisson</label>
+        </div>
+      </div>
 
-    <label for="backThkInput">Épaisseur fond (mm)</label>
-    <input id="backThkInput" type="number" min="0" step="1" value="8">
+      <details class="advanced">
+        <summary>Options d’assemblage (avancé)</summary>
 
-    <div class="row-check">
-      <input id="includeBackInput" type="checkbox" checked>
-      <label for="includeBackInput" class="inline-label">Inclure un fond pour chaque caisson</label>
-    </div>
-    <label for="assemblyMode">Mode d’assemblage</label>
-<select id="assemblyMode">
-  <option value="independent" selected>Assemblage par angles (caissons indépendants)</option>
-  <option value="shared">Panneaux partagés (cloisons communes)</option>
-</select>
+        <label for="assemblyMode">Mode d’assemblage</label>
+        <select id="assemblyMode">
+          <option value="independent" selected>Assemblage par angles (caissons indépendants)</option>
+          <option value="shared">Panneaux partagés (cloisons communes)</option>
+        </select>
 
-<label for="cornerAllowance">Surcote usinage angles (mm)</label>
-<input id="cornerAllowance" type="number" min="0" step="0.5" value="0">
-<p class="hint">Si ta queue d’aronde “mange” un peu de matière ou impose une reprise, mets une surcote (ex: 1–2 mm) puis tu affleures.</p>
+        <label for="cornerAllowance">Surcote usinage angles (mm)</label>
+        <input id="cornerAllowance" type="number" min="0" step="0.5" inputmode="decimal" value="0">
+        <p class="hint">Si ta queue d’aronde “mange” un peu de matière ou impose une reprise, mets une surcote (ex : 1–2 mm) puis tu affleures.</p>
+      </details>
+    </fieldset>
 
+    <fieldset class="group">
+      <legend>Modules</legend>
 
-    <label for="vertModulesInput">Hauteurs d’étages possibles (≤ 320 mm)</label>
-    <textarea id="vertModulesInput">160, 162, 164, 166, 168, 170, 172, 174, 176, 178, 180, 200, 240, 280, 320</textarea>
+      <label for="vertModulesInput">Hauteurs d’étages possibles (≤ 320 mm)</label>
+      <textarea id="vertModulesInput" spellcheck="false">160, 162, 164, 166, 168, 170, 172, 174, 176, 178, 180, 200, 240, 280, 320</textarea>
+      <p class="hint">Sépare les valeurs par des virgules. Exemple : 160, 200, 240</p>
 
-    <label for="modulesInput">Largeurs de modules possibles (mm)</label>
-    <textarea id="modulesInput">200, 202, 204, 206, 208, 210, 280, 320, 360, 400, 480, 560, 640, 720, 800</textarea>
+      <label for="modulesInput">Largeurs de modules possibles (mm)</label>
+      <textarea id="modulesInput" spellcheck="false">200, 202, 204, 206, 208, 210, 280, 320, 360, 400, 480, 560, 640, 720, 800</textarea>
 
-    <label for="targetTol">Tolérance cible max (jeu horizontal, mm, option)</label>
-    <input id="targetTol" type="number" min="0" step="1" placeholder="ex : 2">
+      <label for="targetTol">Tolérance cible max (jeu horizontal, mm, option)</label>
+      <input id="targetTol" type="number" min="0" step="1" inputmode="numeric" placeholder="ex : 2">
+    </fieldset>
 
     <div class="btnrow">
-      <button id="computeBtn">Calculer</button>
+      <button id="computeBtn" type="button">Calculer</button>
       <button id="presetMassifBtn" type="button">Preset bois massif (2 mm)</button>
+      <button id="resetBtn" type="reset" aria-label="Réinitialiser les champs">Réinitialiser</button>
     </div>
 
-    <div id="error" class="error"></div>
+    <div id="error" class="error" role="alert" aria-live="polite"></div>
+    </form>
   </div>
 
   <div class="card">
