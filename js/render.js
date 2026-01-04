@@ -119,7 +119,7 @@ function buildExplodedViewHtml(layoutModules, verticalInfo) {
 
 function buildDetailTableHtml(moduleWidths, counts) {
   let html = `<h3>Détail par largeur</h3>`;
-  html += `<table><thead><tr>
+  html += `<div class="table-wrap"><table><thead><tr>
            <th style="text-align:left;">Largeur (mm)</th>
            <th>Qté</th>
            <th>Total (mm)</th>
@@ -134,13 +134,13 @@ function buildDetailTableHtml(moduleWidths, counts) {
       </tr>`;
     }
   });
-  html += `</tbody></table>`;
+  html += `</tbody></table></div>`;
   return html;
 }
 
 function buildCutListTableHtml(cutList) {
   let html = `<h3>Cut-list atelier (panneaux)</h3>`;
-  html += `<table><thead><tr>
+  html += `<div class="table-wrap"><table><thead><tr>
     <th style="text-align:left;">Pièce</th>
     <th>Longueur (mm)</th>
     <th>Largeur (mm)</th>
@@ -158,7 +158,7 @@ function buildCutListTableHtml(cutList) {
     </tr>`;
   });
 
-  html += `</tbody></table>`;
+  html += `</tbody></table></div>`;
   return html;
 }
 
@@ -175,6 +175,26 @@ function formatResult(metrics, targetTol, inputs, verticalInfo, cutList) {
   const vGap = Math.max(0, bodyTarget - bodyReal);
 
   let html = `<div class="result" id="result-content">`;
+
+  // Résumé compact et avertissement si dépassement
+  const isOverflow = gap < 0;
+  const absGap = Math.abs(gap);
+
+  html += `<div class="result-summary" style="display:flex; flex-wrap:wrap; gap:0.4rem; align-items:center; margin:0.2rem 0 0.8rem;">`;
+  html += `<span class="tag">${countTotal} module${countTotal > 1 ? "s" : ""}</span>`;
+  html += `<span class="tag">largeur ${totalLength.toFixed(0)} mm</span>`;
+  html += isOverflow
+    ? `<span class="tag tag-warn">dépassement ${absGap.toFixed(0)} mm</span>`
+    : `<span class="tag">jeu ${tol} mm</span>`;
+  if (heightTotal) {
+    html += `<span class="tag">corps ${bodyReal.toFixed(0)} mm</span>`;
+    html += `<span class="tag">jeu vertical ${vGap.toFixed(0)} mm</span>`;
+  }
+  html += `</div>`;
+
+  if (isOverflow) {
+    html += `<div class="error" style="margin-top:0;">La somme des modules dépasse la longueur du mur de ${absGap.toFixed(0)} mm. Réduis une largeur de module ou ajoute une largeur plus petite dans la liste.</div>`;
+  }
 
   html += `<p><strong>Mur :</strong> ${wallLength.toFixed(0)} mm</p>`;
   html += `<p><strong>Largeur modules :</strong> ${totalLength.toFixed(0)} mm <span class="tag">jeu ${tol} mm</span></p>`;
@@ -196,8 +216,14 @@ function formatResult(metrics, targetTol, inputs, verticalInfo, cutList) {
       <span class="tag">jeu vertical ${vGap} mm</span></p>`;
   }
 
+  // Atelier/hint line with assembly options
+  const asmLabel = inputs.assemblyMode === "shared" ? "Panneaux partagés" : "Angles (indépendants)";
+  const cornerTxt = (typeof inputs.cornerAllowance === "number" && inputs.cornerAllowance > 0)
+    ? ` | Surcote angles : ${inputs.cornerAllowance} mm`
+    : "";
+
   html += `<p class="hint">
-    Profondeur : ${inputs.depthMm} mm | Épaisseur matériau : ${inputs.matThk} mm | Fond : ${inputs.backThk} mm
+    Profondeur : ${inputs.depthMm} mm | Épaisseur matériau : ${inputs.matThk} mm | Fond : ${inputs.backThk} mm | Assemblage : ${asmLabel}${cornerTxt}
   </p>`;
 
   html += `<div class="btnrow" style="margin-top:0.8rem;">
