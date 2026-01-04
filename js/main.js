@@ -3,11 +3,43 @@
 const STORAGE_KEY = "calepinage_projects_v2";
 
 let currentResult = null;       // { wallLength, moduleWidths }
+let currentSolvedH = null;     // résultat complet du solver horizontal
 let currentLayoutModules = [];  // [{width, index}]
 let currentVerticalInfo = null;
 let currentCutList = [];
 
 function $(id) { return document.getElementById(id); }
+
+// UX helpers for validation and error display
+function setFieldInvalid(id, isInvalid) {
+  const el = $(id);
+  if (!el) return;
+  if (isInvalid) {
+    el.setAttribute("aria-invalid", "true");
+  } else {
+    el.removeAttribute("aria-invalid");
+  }
+}
+
+function showError(message, focusId) {
+  const err = $("error");
+  if (err) err.textContent = message;
+
+  if (focusId) {
+    const el = $(focusId);
+    if (el && typeof el.focus === "function") {
+      el.focus();
+      try { el.scrollIntoView({ behavior: "smooth", block: "center" }); } catch {}
+    }
+    setFieldInvalid(focusId, true);
+  }
+}
+
+function clearErrors() {
+  const err = $("error");
+  if (err) err.textContent = "";
+  ["wallLength", "heightInput", "modulesInput", "vertModulesInput"].forEach(id => setFieldInvalid(id, false));
+}
 
 function computeMetrics() {
   if (!currentResult) return null;
@@ -35,7 +67,6 @@ function readInputs() {
   const assemblyMode = $("assemblyMode").value; // 'independent' | 'shared'
   const cornerAllowance = parseFloat($("cornerAllowance").value) || 0;
 
-
   const plinthMm = parseFloat($("plinthInput").value) || 0;
   const topMm = parseFloat($("topInput").value) || 0;
 
@@ -61,45 +92,77 @@ function readInputs() {
     includeBack,
     moduleWidths,
     verticalHeights,
-    targetTolValue
+    targetTolValue,
+    assemblyMode,
+    cornerAllowance
   };
 }
 
 function computeAll() {
-  const err = $("error");
-  err.textContent = "";
+  clearErrors();
 
   const inputs = readInputs();
 
   if (isNaN(inputs.wallLength) || inputs.wallLength <= 0) {
-    err.textContent = "Merci d’indiquer une longueur de mur valide.";
+    showError("Merci d’indiquer une longueur de mur valide.", "wallLength");
     return false;
   }
   if (!inputs.moduleWidths || inputs.moduleWidths.length === 0) {
-    err.textContent = "Merci d’indiquer des largeurs de modules valides.";
+    showError("Merci d’indiquer des largeurs de modules valides (séparées par des virgules).", "modulesInput");
     return false;
   }
 
-  // Solve horizontal
-  const solvedH = solveOptimalCombination(inputs.wallLength, inputs.moduleWidths);
+  // Solve horizontal (option: tolérance max si renseignée)
+  const solvedH = solveOptimalCombination(
+    inputs.wallLength,
+    inputs.moduleWidths,
+    {
+      maxGapMm: (typeof inputs.targetTolValue === "number" ? inputs.targetTolValue : null),
+      preferLargerModules: true
+    }
+  );
   if (!solvedH) {
-    err.textContent = "Impossible de trouver une combinaison horizontale.";
+    showError("Impossible de trouver une combinaison horizontale.");
     return false;
+  }
+
+  currentSolvedH = solvedH;
+
+  // Si une tolérance est fournie, on prévient si le solver n'arrive pas à rester dedans
+  if (typeof inputs.targetTolValue === "number" && !isNaN(inputs.targetTolValue) && inputs.targetTolValue >= 0) {
+    if (typeof solvedH.gap === "number" && solvedH.gap > inputs.targetTolValue) {
+      // On n'empêche pas l'affichage, mais on informe clairement
+      const err = $("error");
+      if (err) err.textContent = `Attention : jeu minimal trouvé = ${Math.round(solvedH.gap)} mm, supérieur à la tolérance (${inputs.targetTolValue} mm).`;
+    }
   }
 
   currentResult = { wallLength: solvedH.wallLength, moduleWidths: solvedH.moduleWidths };
   currentLayoutModules = [];
-  solvedH.moduleWidths.forEach((w, idx) => {
-    const q = solvedH.solution.counts[idx];
-    for (let k = 0; k < q; k++) currentLayoutModules.push({ width: w, index: idx });
-  });
+
+  // On privilégie la liste "dépliée" si fournie par le solver
+  if (Array.isArray(solvedH.expandedModules) && solvedH.expandedModules.length) {
+    solvedH.expandedModules.forEach((w) => {
+      const idx = solvedH.moduleWidths.indexOf(w);
+      currentLayoutModules.push({ width: w, index: Math.max(0, idx) });
+    });
+  } else {
+    solvedH.moduleWidths.forEach((w, idx) => {
+      const q = solvedH.solution.counts[idx];
+      for (let k = 0; k < q; k++) currentLayoutModules.push({ width: w, index: idx });
+    });
+  }
 
   // Solve vertical for body
   const bodyTarget = inputs.heightTotal
     ? Math.max(1, inputs.heightTotal - inputs.plinthMm - inputs.topMm)
     : 320;
 
-  currentVerticalInfo = solveVerticalComposition(bodyTarget, inputs.verticalHeights);
+  currentVerticalInfo = solveVerticalComposition(bodyTarget, inputs.verticalHeights, {
+    // pas de tolérance dédiée pour l'instant, mais on garde l'API prête
+    maxGapMm: null,
+    preferTallerRows: true
+  });
 
   // Cut-list atelier
   currentCutList = buildCutList({
@@ -112,7 +175,6 @@ function computeAll() {
     assemblyMode: inputs.assemblyMode,
     cornerAllowance: inputs.cornerAllowance
   });
-  
 
   renderAll();
   return true;
@@ -466,7 +528,9 @@ function getCurrentProjectData(name) {
       includeBack: inputs.includeBack,
       modulesInput: $("modulesInput").value,
       vertModulesInput: $("vertModulesInput").value,
-      targetTolValue: inputs.targetTolValue
+      targetTolValue: inputs.targetTolValue,
+      assemblyMode: inputs.assemblyMode,
+      cornerAllowance: inputs.cornerAllowance
     }
   };
 }
@@ -486,6 +550,9 @@ function applyProjectData(project) {
   $("modulesInput").value = inp.modulesInput ?? $("modulesInput").value;
   $("vertModulesInput").value = inp.vertModulesInput ?? $("vertModulesInput").value;
   $("targetTol").value = (inp.targetTolValue ?? "");
+
+  if ($("assemblyMode") && inp.assemblyMode) $("assemblyMode").value = inp.assemblyMode;
+  if ($("cornerAllowance")) $("cornerAllowance").value = inp.cornerAllowance ?? 0;
 
   computeAll();
 }
@@ -578,6 +645,21 @@ document.addEventListener("DOMContentLoaded", () => {
     const f = e.target.files && e.target.files[0];
     if (f) importJSONFile(f);
   };
+
+  // Form submit/reset: handle Enter and clear UX errors/output
+  const form = $("paramsForm");
+  if (form) {
+    form.addEventListener("submit", (e) => {
+      e.preventDefault();
+      computeAll();
+    });
+
+    form.addEventListener("reset", () => {
+      clearErrors();
+      const out = $("output");
+      if (out) out.style.display = "none";
+    });
+  }
 
   refreshProjectsUI();
 });
