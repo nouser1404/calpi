@@ -1,0 +1,275 @@
+:root{
+  --bg: #0b1220;
+  --card: rgba(255,255,255,.06);
+  --card2: rgba(255,255,255,.08);
+  --text: rgba(255,255,255,.92);
+  --muted: rgba(255,255,255,.65);
+  --stroke: rgba(255,255,255,.12);
+  --accent: #6ee7ff;
+  --accent2:#a78bfa;
+}
+
+*{ box-sizing:border-box; }
+body{
+  margin:0;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  color:var(--text);
+  background: radial-gradient(1200px 800px at 20% 0%, rgba(110,231,255,.12), transparent 55%),
+              radial-gradient(900px 700px at 95% 10%, rgba(167,139,250,.16), transparent 60%),
+              var(--bg);
+}
+
+body{
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+.app-header{
+  padding-top: calc(14px + env(safe-area-inset-top));
+}
+
+
+.app-header{
+  padding:18px 20px;
+  border-bottom:1px solid var(--stroke);
+  backdrop-filter: blur(8px);
+  position:sticky; top:0;
+  background: rgba(11,18,32,.65);
+}
+
+.brand{ display:flex; align-items:center; gap:10px; }
+.brand h1{ font-size:18px; margin:0; font-weight:650; letter-spacing:.2px; }
+.material-symbols-rounded{ font-variation-settings: 'FILL' 1, 'wght' 400; }
+
+.layout{
+  display:grid;
+  gap:16px;
+  padding:16px;
+  grid-template-columns: 380px 1fr;
+}
+
+.card{
+  background: linear-gradient(180deg, var(--card), rgba(255,255,255,.03));
+  border:1px solid var(--stroke);
+  border-radius:16px;
+  padding:14px;
+  box-shadow: 0 10px 30px rgba(0,0,0,.25);
+}
+
+.card.wide{ grid-column: 1 / -1; }
+
+h2{ margin:0 0 10px; font-size:15px; font-weight:650; color: rgba(255,255,255,.9); }
+
+.grid{
+  display:grid;
+  grid-template-columns: 1fr 1fr;
+  gap:10px;
+}
+label{ display:flex; flex-direction:column; gap:6px; font-size:12px; color: var(--muted); }
+input{
+  padding:10px 10px;
+  border-radius:12px;
+  border:1px solid var(--stroke);
+  background: rgba(255,255,255,.05);
+  color: var(--text);
+  outline:none;
+}
+
+.row{ margin:10px 0; }
+.switch{ flex-direction:row; align-items:center; gap:10px; }
+.switch input{ width:18px; height:18px; }
+
+.btn{
+  display:inline-flex; align-items:center; gap:8px;
+  padding:10px 12px;
+  border:1px solid var(--stroke);
+  border-radius:12px;
+  background: rgba(110,231,255,.14);
+  color: var(--text);
+  cursor:pointer;
+}
+.btn:hover{ background: rgba(110,231,255,.20); }
+
+canvas{
+  width:100%;
+  height:auto;
+  background: rgba(255,255,255,.03);
+  border:1px solid var(--stroke);
+  border-radius:14px;
+}
+
+.hint{ margin:10px 0 0; font-size:12px; color: var(--muted); }
+
+.table-wrap{ overflow:auto; border-radius:12px; border:1px solid var(--stroke); }
+table{ width:100%; border-collapse:collapse; font-size:13px; }
+th, td{ padding:10px; border-bottom:1px solid var(--stroke); white-space:nowrap; }
+thead th{ position:sticky; top:0; background: rgba(11,18,32,.85); }
+tbody tr:hover{ background: rgba(167,139,250,.10); }
+
+.summary{ display:flex; flex-wrap:wrap; gap:10px; margin-bottom:10px; color: var(--muted); font-size:13px; }
+.badge{
+  padding:6px 10px;
+  border:1px solid var(--stroke);
+  border-radius:999px;
+  background: rgba(255,255,255,.04);
+}
+
+.details{
+  margin:0;
+  padding:12px;
+  border-radius:12px;
+  border:1px solid var(--stroke);
+  background: rgba(0,0,0,.18);
+  overflow:auto;
+  color: rgba(255,255,255,.85);
+  font-size:12px;
+  line-height:1.4;
+}
+.actions{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  margin: 8px 0 12px;
+  flex-wrap:wrap;
+}
+
+.actions-left{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+
+.mini{
+  flex-direction:column;
+  gap:6px;
+  font-size:12px;
+  color: var(--muted);
+}
+select{
+  padding:10px 10px;
+  border-radius:12px;
+  border:1px solid var(--stroke);
+  background: rgba(255,255,255,.05);
+  color: var(--text);
+  outline:none;
+}
+
+
+/* ========== Responsive PWA ========== */
+
+/* Une largeur max globale pour éviter les lignes trop longues sur grand écran */
+.layout{
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+/* Boutons et contrôles : meilleurs touch targets */
+input, select, button{
+  min-height: 44px; /* recommandé mobile */
+}
+
+/* Canvas fluide */
+canvas{
+  width: 100%;
+  height: auto;
+}
+
+/* Tables : scroll horizontal confortable */
+.table-wrap{
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Actions (boutons export etc.) : wrap bien */
+.actions{
+  gap: 10px;
+}
+.actions-left{
+  gap: 10px;
+}
+
+/* --- Tablette et moins --- */
+@media (max-width: 980px){
+  .layout{
+    grid-template-columns: 1fr; /* 1 seule colonne */
+  }
+
+  .card.wide{
+    grid-column: auto; /* plus besoin du "wide" */
+  }
+
+  /* Header un peu plus compact */
+  .app-header{
+    padding: 14px 14px;
+  }
+
+  /* Les grids de formulaire en 2 colonnes deviennent 2 -> 1 si nécessaire */
+  .grid{
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* --- Mobile --- */
+@media (max-width: 620px){
+  .layout{
+    padding: 12px;
+    gap: 12px;
+  }
+
+  .card{
+    padding: 12px;
+    border-radius: 14px;
+  }
+
+  .brand h1{
+    font-size: 16px;
+  }
+
+  /* Formulaire: 1 colonne */
+  .grid{
+    grid-template-columns: 1fr;
+  }
+
+  /* Actions : empilement vertical propre */
+  .actions{
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .actions-left{
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  /* Boutons : pleine largeur */
+  .btn{
+    width: 100%;
+    justify-content: center;
+  }
+
+  /* Le switch garde une bonne lisibilité */
+  .switch{
+    align-items: flex-start;
+  }
+  .switch span{
+    line-height: 1.25;
+  }
+
+  /* Table headers lisibles */
+  th, td{
+    padding: 10px 8px;
+    font-size: 12.5px;
+  }
+
+  /* Détails calcul : pas trop petit */
+  .details{
+    font-size: 12px;
+  }
+}
+
+/* --- Très petit écran --- */
+@media (max-width: 380px){
+  .brand{
+    gap: 8px;
+  }
+  .material-symbols-rounded{
+    font-size: 20px;
+  }
+  input, select{
+    font-size: 16px; /* évite zoom iOS sur focus */
+  }
+}

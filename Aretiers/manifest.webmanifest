@@ -1,0 +1,14 @@
+{
+  "name": "Corroyage Pyramide",
+  "short_name": "Corroyage",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0b1220",
+  "theme_color": "#0b1220",
+  "description": "Calcul des angles de corroyage et génération de gabarits (SVG) pour pyramides et troncs de pyramide.",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

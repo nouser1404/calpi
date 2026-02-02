@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Corroyage pyramide</title>
+
+  <link rel="stylesheet" href="css/styles.css" />
+  <link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0b1220">
+
+<!-- iOS (optionnel mais pratique) -->
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+
+  <!-- Google Material Symbols (icônes) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:wght@400&display=swap" rel="stylesheet">
+</head>
+<body>
+  <header class="app-header">
+    <div class="brand">
+      <span class="material-symbols-rounded">architecture</span>
+      <h1>Corroyage Pyramide</h1>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="card">
+      <h2>Entrées</h2>
+
+      <div class="grid">
+        <label>Nombre de faces (n)
+          <input id="n" type="number" min="3" value="6">
+        </label>
+
+        <label>Rayon base (R)
+          <input id="R" type="number" min="0" step="0.1" value="300">
+        </label>
+
+        <label>Hauteur (H)
+          <input id="H" type="number" min="0" step="0.1" value="400">
+        </label>
+
+        <label>Tronquage zCut (0..H)
+          <input id="zCut" type="number" min="0" step="0.1" value="0">
+        </label>
+
+        <label>Désaxage dx
+          <input id="dx" type="number" step="0.1" value="0">
+        </label>
+
+        <label>Désaxage dy
+          <input id="dy" type="number" step="0.1" value="0">
+        </label>
+      </div>
+
+      <div class="row">
+        <label class="switch">
+          <input id="showToolAngle" type="checkbox" checked>
+          <span>Afficher “réglage outil” (90° − δ/2)</span>
+        </label>
+      </div>
+
+      <button id="recalc" class="btn">
+        <span class="material-symbols-rounded">calculate</span>
+        Recalculer
+      </button>
+      <label class="mini">
+        Annotations SVG
+        <select id="svgAnnot">
+          <option value="bevelTool" selected>Réglage outil (90° − δ/2)</option>
+          <option value="bevelFace">Biseau (δ/2)</option>
+          <option value="delta">Dièdre δ</option>
+          <option value="none">Aucune</option>
+        </select>
+      </label>
+      <p class="hint" style="margin-top:8px">
+        Réglage outil = 90° − (δ/2). (δ = dièdre entre 2 faces)
+      </p>
+            
+      <label class="switch">
+        <input id="svgShowEdges" type="checkbox" checked>
+        <span>Afficher les arêtes annotées</span>
+      </label>
+    </section>
+
+    <section class="card">
+      <h2>Rendu</h2>
+      <canvas id="view" width="820" height="520"></canvas>
+      <p class="hint">Survole une ligne du tableau pour surligner l’arêtier correspondant.</p>
+    </section>
+
+    <section class="card wide">
+      <h2>Résultats</h2>
+      <div id="summary" class="summary"></div>
+      <div class="actions">
+        <div class="actions-left">
+          <label class="mini">
+            Face
+            <select id="faceIndex"></select>
+          </label>
+          <button id="exportFaceSvg" class="btn">
+            <span class="material-symbols-rounded">download</span>
+            Exporter gabarit (SVG)
+          </button>
+          <button id="exportAllSvg" class="btn">
+            <span class="material-symbols-rounded">file_copy</span>
+            Exporter tous (SVG)
+          </button>
+        </div>
+      
+        <label class="switch">
+          <input id="preferHoveredFace" type="checkbox" checked>
+          <span>Exporter la face survolée</span>
+        </label>
+      </div>
+      
+      <div class="table-wrap">
+        <table id="results">
+          <thead>
+            <tr>
+              <th>Arêtier i</th>
+              <th>Longueur A→Vi</th>
+              <th>Dièdre δ</th>
+              <th>Biseau par face (δ/2)</th>
+              <th>Réglage outil</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="card wide">
+      <h2>Détail du calcul</h2>
+      <pre id="details" class="details"></pre>
+    </section>
+  </main>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
