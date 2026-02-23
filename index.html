@@ -2,118 +2,85 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <title>Calepinage & meuble modulaire</title>
+  <title>Calpinage panneaux — Débit optimisé</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="stylesheet" href="style.css">
 </head>
 
 <body>
   <div class="card">
-    <h1>Calepinage & meuble modulaire</h1>
-    <p class="hint">Renseigne tes cotes, choisis des largeurs/hauteurs de modules, puis lance le calcul.</p>
-    <ul class="hint">
-      <li>Ne dépasse jamais la longueur du mur</li>
-      <li>Vue 1D / 2D / Vue éclatée</li>
-      <li>Export PNG + PDF multi-pages</li>
-      <li>Cut-list atelier (panneaux)</li>
-      <li>Sauvegarde locale (projets)</li>
-    </ul>
+    <h1>Calpinage panneaux</h1>
+    <p class="hint">Optimisation du débit de panneaux (type Maxcut) : saisissez les dimensions du panneau et des pièces à débiter. Le calcul minimise les chutes et le nombre de panneaux.</p>
   </div>
 
   <div class="card">
     <form id="paramsForm" autocomplete="off">
-    <h2>Paramètres</h2>
+      <h2>Panneau</h2>
 
-    <fieldset class="group">
-      <legend>Mur & hauteur</legend>
-
-      <label for="wallLength">Longueur du mur (mm)</label>
-      <input id="wallLength" type="number" min="1" step="1" inputmode="numeric" placeholder="ex : 3520" autofocus required>
-      <p class="hint" id="wallLengthHint">Astuce : mesure à plusieurs endroits et garde la cote la plus petite.</p>
-
-      <label for="heightInput">Hauteur totale cible (mm)</label>
-      <input id="heightInput" type="number" min="1" step="1" inputmode="numeric" placeholder="ex : 950" required>
-
-      <div class="row-2">
-        <div>
-          <label for="plinthInput">Plinthe / fileur bas (mm)</label>
-          <input id="plinthInput" type="number" min="0" step="1" inputmode="numeric" value="80">
+      <fieldset class="group">
+        <legend>Dimensions du panneau (mm)</legend>
+        <div class="row-2">
+          <div>
+            <label for="panelLength">Longueur</label>
+            <input id="panelLength" type="number" min="1" step="1" value="2800" required>
+          </div>
+          <div>
+            <label for="panelWidth">Largeur</label>
+            <input id="panelWidth" type="number" min="1" step="1" value="1900" required>
+          </div>
         </div>
         <div>
-          <label for="topInput">Fileur haut (mm)</label>
-          <input id="topInput" type="number" min="0" step="1" inputmode="numeric" value="60">
+          <label for="panelThickness">Épaisseur (mm)</label>
+          <input id="panelThickness" type="number" min="0.1" step="0.5" value="19">
         </div>
-      </div>
-    </fieldset>
-
-    <fieldset class="group">
-      <legend>Atelier</legend>
-
-      <div class="row-2">
-        <div>
-          <label for="depthInput">Profondeur caisson (mm)</label>
-          <input id="depthInput" type="number" min="50" step="1" inputmode="numeric" value="400">
-        </div>
-        <div>
-          <label for="matThkInput">Épaisseur matériau (mm)</label>
-          <input id="matThkInput" type="number" min="1" step="1" inputmode="numeric" value="19">
-        </div>
-      </div>
-
-      <div class="row-2">
-        <div>
-          <label for="backThkInput">Épaisseur fond (mm)</label>
-          <input id="backThkInput" type="number" min="0" step="1" inputmode="numeric" value="8">
-        </div>
-        <div class="row-check" style="align-items:flex-end;">
-          <input id="includeBackInput" type="checkbox" checked>
-          <label for="includeBackInput" class="inline-label">Inclure un fond pour chaque caisson</label>
-        </div>
-      </div>
-
-      <details class="advanced">
-        <summary>Options d’assemblage (avancé)</summary>
-
-        <label for="assemblyMode">Mode d’assemblage</label>
-        <select id="assemblyMode">
-          <option value="independent" selected>Assemblage par angles (caissons indépendants)</option>
-          <option value="shared">Panneaux partagés (cloisons communes)</option>
+        <label for="panelCoating">Type de revêtement</label>
+        <select id="panelCoating">
+          <option value="melamine">Mélaminé</option>
+          <option value="stratifie">Stratifié</option>
+          <option value="contreplaque">Contreplaqué</option>
+          <option value="mdf">MDF</option>
+          <option value="osb">OSB</option>
+          <option value="autre">Autre</option>
         </select>
+        <div>
+          <label for="sawKerf">Épaisseur de la lame de scie (mm)</label>
+          <input id="sawKerf" type="number" min="0" step="0.1" value="3">
+        </div>
+      </fieldset>
 
-        <label for="cornerAllowance">Surcote usinage angles (mm)</label>
-        <input id="cornerAllowance" type="number" min="0" step="0.5" inputmode="decimal" value="0">
-        <p class="hint">Si ta queue d’aronde “mange” un peu de matière ou impose une reprise, mets une surcote (ex : 1–2 mm) puis tu affleures.</p>
-      </details>
-    </fieldset>
+      <h2>Pièces à débiter</h2>
+      <fieldset class="group">
+        <legend>Liste des pièces</legend>
+        <p class="hint">Ajoutez les pièces (longueur × largeur en mm) et les quantités. Cochez « Chant longueur » et/ou « Chant largeur » si la pièce a un chant plaqué sur ces côtés.</p>
 
-    <fieldset class="group">
-      <legend>Modules</legend>
+        <div id="piecesContainer" class="pieces-container">
+          <div class="piece-row piece-row-header">
+            <span class="piece-name">Nom</span>
+            <span class="piece-length">Long. (mm)</span>
+            <span class="piece-width">Larg. (mm)</span>
+            <span class="piece-qty">Qté</span>
+            <span class="piece-chants">Chant long.</span>
+            <span class="piece-chants">Chant larg.</span>
+            <span class="piece-actions"></span>
+          </div>
+        </div>
+        <div class="btnrow">
+          <button id="addPieceBtn" type="button">+ Ajouter une pièce</button>
+        </div>
+      </fieldset>
 
-      <label for="vertModulesInput">Hauteurs d’étages possibles (≤ 320 mm)</label>
-      <textarea id="vertModulesInput" spellcheck="false">160, 162, 164, 166, 168, 170, 172, 174, 176, 178, 180, 200, 240, 280, 320</textarea>
-      <p class="hint">Sépare les valeurs par des virgules. Exemple : 160, 200, 240</p>
-
-      <label for="modulesInput">Largeurs de modules possibles (mm)</label>
-      <textarea id="modulesInput" spellcheck="false">200, 202, 204, 206, 208, 210, 280, 320, 360, 400, 480, 560, 640, 720, 800</textarea>
-
-      <label for="targetTol">Tolérance cible max (jeu horizontal, mm, option)</label>
-      <input id="targetTol" type="number" min="0" step="1" inputmode="numeric" placeholder="ex : 2">
-    </fieldset>
-
-    <div class="btnrow">
-      <button id="computeBtn" type="button">Calculer</button>
-      <button id="presetMassifBtn" type="button">Preset bois massif (2 mm)</button>
-      <button id="resetBtn" type="reset" aria-label="Réinitialiser les champs">Réinitialiser</button>
-    </div>
-
-    <div id="error" class="error" role="alert" aria-live="polite"></div>
+      <div class="btnrow">
+        <button id="computeBtn" type="button">Calculer le calpinage</button>
+        <button id="resetBtn" type="reset">Réinitialiser</button>
+      </div>
+      <div id="error" class="error" role="alert" aria-live="polite"></div>
     </form>
   </div>
 
   <div class="card">
     <h2>Sauvegardes</h2>
     <label for="projectName">Nom du projet</label>
-    <input id="projectName" type="text" placeholder="ex : Buffet salon - Mur Nord">
+    <input id="projectName" type="text" placeholder="ex : Meuble cuisine — Éléments hauts">
 
     <div class="btnrow">
       <button id="saveProjectBtn" type="button">Sauvegarder</button>
@@ -121,18 +88,15 @@
       <button id="importJsonBtn" type="button">Importer JSON</button>
       <input id="importJsonFile" type="file" accept=".json" style="display:none;">
     </div>
-
     <div id="projectsList" class="projects"></div>
   </div>
 
   <div id="output" class="card" style="display:none;"></div>
 
-  <!-- Dépendances -->
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 
-  <!-- App -->
-  <script src="js/solver.js"></script>
+  <script src="js/solver2d.js"></script>
   <script src="js/render.js"></script>
   <script src="js/main.js"></script>
 </body>
