@@ -2,6 +2,12 @@
 
 const STORAGE_KEY = "calpinage_panneaux_v1";
 
+const PIECE_NAMES = [
+  "Plateau", "Côté", "Fond", "Étagère", "Porte", "Tablette", "Traverse", "Montant",
+  "Pied", "Placard", "Tiroir", "Face tiroir", "Fond tiroir", "Caisson", "Socle",
+  "Plan de travail", "Crédence", "Fronton", "Chant", "Autre"
+];
+
 let currentNesting = null; // résultat solvePanelNesting
 
 function $(id) { return document.getElementById(id); }
@@ -37,12 +43,18 @@ function readPanelInputs() {
   const thicknessMm = parseFloat($("panelThickness").value);
   const coating = ($("panelCoating") && $("panelCoating").value) || "melamine";
   const sawKerfMm = parseFloat($("sawKerf").value) || 0;
+  const panelPrice = parseFloat($("panelPrice") && $("panelPrice").value);
+  const timePerCut = parseFloat($("timePerCut") && $("timePerCut").value) || 25;
+  const timePerPanel = parseFloat($("timePerPanel") && $("timePerPanel").value) || 60;
   return {
     lengthMm: isNaN(lengthMm) ? 2800 : lengthMm,
     widthMm: isNaN(widthMm) ? 1900 : widthMm,
     thicknessMm: isNaN(thicknessMm) ? 19 : thicknessMm,
     coating,
-    sawKerfMm: isNaN(sawKerfMm) ? 3 : Math.max(0, sawKerfMm)
+    sawKerfMm: isNaN(sawKerfMm) ? 3 : Math.max(0, sawKerfMm),
+    panelPrice: isNaN(panelPrice) || panelPrice < 0 ? null : panelPrice,
+    timePerCut: Math.max(0, timePerCut),
+    timePerPanel: Math.max(0, timePerPanel)
   };
 }
 
@@ -58,7 +70,7 @@ function readPiecesFromDOM() {
     const qtyEl = row.querySelector(".piece-qty");
     const chantLong = row.querySelector(".chant-long");
     const chantLarg = row.querySelector(".chant-larg");
-    const name = nameEl ? (nameEl.value || "").trim() || `Pièce ${idx + 1}` : `Pièce ${idx + 1}`;
+    const name = nameEl ? (nameEl.value || "").trim() || (nameEl.options && nameEl.options[nameEl.selectedIndex] ? nameEl.options[nameEl.selectedIndex].text : "") || `Pièce ${idx + 1}` : `Pièce ${idx + 1}`;
     const len = parseFloat(lenEl ? lenEl.value : 0);
     const wid = parseFloat(widEl ? widEl.value : 0);
     const qty = Math.max(0, Math.floor(parseFloat(qtyEl ? qtyEl.value : 0) || 0));
@@ -84,26 +96,74 @@ function addPieceRow(data = {}) {
   const name = (data.name != null ? data.name : "").trim() || "";
   const len = data.lengthMm != null ? data.lengthMm : "";
   const wid = data.widthMm != null ? data.widthMm : "";
-  const qty = data.qty != null ? data.qty : 1;
+  const qty = Math.min(30, Math.max(1, parseInt(data.qty, 10) || 1));
   const chantLongueur = !!data.chantLongueur;
   const chantLargeur = !!data.chantLargeur;
+
+  let nameOptions = PIECE_NAMES.map(n => `<option value="${escapeAttr(n)}"${name === n ? " selected" : ""}>${escapeHtml(n)}</option>`).join("");
+  if (name && !PIECE_NAMES.includes(name)) nameOptions += `<option value="${escapeAttr(name)}" selected>${escapeHtml(name)}</option>`;
 
   const row = document.createElement("div");
   row.className = "piece-row";
   row.innerHTML = `
-    <input type="text" class="piece-name" placeholder="Nom" value="${escapeAttr(name)}">
+    <select class="piece-name" title="Nom de la pièce">${nameOptions}</select>
     <input type="number" class="piece-length" min="1" step="1" placeholder="Long." value="${escapeAttr(String(len))}">
     <input type="number" class="piece-width" min="1" step="1" placeholder="Larg." value="${escapeAttr(String(wid))}">
-    <input type="number" class="piece-qty" min="1" step="1" value="${escapeAttr(String(qty))}">
-    <label class="chant-cb" title="Chant sur la longueur"><input type="checkbox" class="chant-long" ${chantLongueur ? "checked" : ""}></label>
-    <label class="chant-cb" title="Chant sur la largeur"><input type="checkbox" class="chant-larg" ${chantLargeur ? "checked" : ""}></label>
+    <select class="piece-qty" title="Quantité">${Array.from({ length: 30 }, (_, i) => i + 1).map(n => `<option value="${n}"${n === qty ? " selected" : ""}>${n}</option>`).join("")}</select>
+    <div class="piece-preview-wrap" role="img" aria-label="Aperçu pièce">
+      <input type="checkbox" class="chant-long" id="chant-long-${Math.random().toString(36).slice(2, 8)}" ${chantLongueur ? "checked" : ""} hidden>
+      <input type="checkbox" class="chant-larg" id="chant-larg-${Math.random().toString(36).slice(2, 8)}" ${chantLargeur ? "checked" : ""} hidden>
+      <svg class="piece-preview-svg" viewBox="0 0 60 44" width="60" height="44" xmlns="http://www.w3.org/2000/svg"><rect class="piece-preview-bg" x="2" y="2" width="56" height="40" fill="#f0f0f0" stroke="#999"/><line class="edge edge-top" x1="2" y1="2" x2="58" y2="2" stroke="#333" stroke-width="1.5" title="Cliquer : chant longueur"/><line class="edge edge-right" x1="58" y1="2" x2="58" y2="42" stroke="#333" stroke-width="1.5" title="Cliquer : chant largeur"/><line class="edge edge-bottom" x1="58" y1="42" x2="2" y2="42" stroke="#333" stroke-width="1.5" title="Cliquer : chant longueur"/><line class="edge edge-left" x1="2" y1="42" x2="2" y2="2" stroke="#333" stroke-width="1.5" title="Cliquer : chant largeur"/><text class="piece-preview-dim" x="30" y="24" text-anchor="middle" font-size="9" fill="#333">L×l</text></svg>
+    </div>
     <button type="button" class="btn-remove-piece" aria-label="Supprimer la pièce">×</button>
   `;
   container.appendChild(row);
 
-  row.querySelector(".btn-remove-piece").onclick = () => {
-    row.remove();
-  };
+  const svg = row.querySelector(".piece-preview-svg");
+  const dimText = row.querySelector(".piece-preview-dim");
+  const cbLong = row.querySelector(".chant-long");
+  const cbLarg = row.querySelector(".chant-larg");
+
+  function updatePreview() {
+    const l = parseFloat(row.querySelector(".piece-length").value) || 0;
+    const w = parseFloat(row.querySelector(".piece-width").value) || 0;
+    dimText.textContent = (l && w) ? `${l}×${w}` : "L×l";
+    const top = row.querySelector(".edge-top");
+    const bottom = row.querySelector(".edge-bottom");
+    const left = row.querySelector(".edge-left");
+    const right = row.querySelector(".edge-right");
+    const chant = "#b36b00";
+    const normal = "#333";
+    if (cbLong.checked) {
+      top.setAttribute("stroke", chant); top.setAttribute("stroke-width", "2"); top.setAttribute("stroke-dasharray", "3,2");
+      bottom.setAttribute("stroke", chant); bottom.setAttribute("stroke-width", "2"); bottom.setAttribute("stroke-dasharray", "3,2");
+    } else {
+      top.setAttribute("stroke", normal); top.setAttribute("stroke-width", "1.5"); top.removeAttribute("stroke-dasharray");
+      bottom.setAttribute("stroke", normal); bottom.setAttribute("stroke-width", "1.5"); bottom.removeAttribute("stroke-dasharray");
+    }
+    if (cbLarg.checked) {
+      left.setAttribute("stroke", chant); left.setAttribute("stroke-width", "2"); left.setAttribute("stroke-dasharray", "3,2");
+      right.setAttribute("stroke", chant); right.setAttribute("stroke-width", "2"); right.setAttribute("stroke-dasharray", "3,2");
+    } else {
+      left.setAttribute("stroke", normal); left.setAttribute("stroke-width", "1.5"); left.removeAttribute("stroke-dasharray");
+      right.setAttribute("stroke", normal); right.setAttribute("stroke-width", "1.5"); right.removeAttribute("stroke-dasharray");
+    }
+  }
+
+  ["edge-top", "edge-bottom"].forEach(cls => {
+    row.querySelector(`.${cls}`).addEventListener("click", () => { cbLong.checked = !cbLong.checked; updatePreview(); });
+  });
+  ["edge-left", "edge-right"].forEach(cls => {
+    row.querySelector(`.${cls}`).addEventListener("click", () => { cbLarg.checked = !cbLarg.checked; updatePreview(); });
+  });
+
+  row.querySelector(".piece-length").addEventListener("input", updatePreview);
+  row.querySelector(".piece-width").addEventListener("input", updatePreview);
+  cbLong.addEventListener("change", updatePreview);
+  cbLarg.addEventListener("change", updatePreview);
+  updatePreview();
+
+  row.querySelector(".btn-remove-piece").onclick = () => row.remove();
 }
 
 function escapeAttr(s) {
@@ -198,17 +258,26 @@ async function exportPDFCalpinage(panelInputs) {
       pdf.text(`Date : ${today}`, margin, 23);
       pdf.text(`Panneau : ${currentNesting.panelLengthMm} × ${currentNesting.panelWidthMm} mm  |  Épaisseur : ${panel.thicknessMm} mm  |  Revêtement : ${getCoatingLabel(panel.coating)}  |  Lame : ${currentNesting.sawKerfMm} mm`, margin, 29);
       pdf.text(`Nombre total de panneaux : ${currentNesting.panels.length}  |  Chute totale : ${wastePct} %  |  Utilisation : ${(100 - parseFloat(wastePct)).toFixed(1)} %`, margin, 35);
+      if (panel.panelPrice != null && panel.panelPrice > 0) {
+        pdf.text(`Coût matière : ${(currentNesting.panels.length * panel.panelPrice).toFixed(2)} €`, margin, 41);
+      }
+      const cutSegs = currentNesting.totalCutSegments != null ? currentNesting.totalCutSegments : 0;
+      const cutTimeSec = Math.round((cutSegs * (panel.timePerCut || 25)) + (currentNesting.panels.length * (panel.timePerPanel || 60)));
+      const cutMin = Math.floor(cutTimeSec / 60);
+      const cutSec = cutTimeSec % 60;
+      pdf.text(`Temps de découpe estimé : ~ ${cutMin > 0 ? cutMin + " min " + (cutSec ? cutSec + " s" : "") : cutTimeSec + " s"}`, margin, 47);
     }
 
+    const topY = (i === 0 && (panel.panelPrice > 0 || currentNesting.totalCutSegments > 0)) ? 52 : (i === 0 ? 44 : 20);
     pdf.setFont("helvetica", "bold");
     pdf.setFontSize(11);
-    pdf.text(`Panneau ${i + 1}`, margin, i === 0 ? 44 : 20);
+    pdf.text(`Panneau ${i + 1}`, margin, topY);
     pdf.setFont("helvetica", "normal");
     pdf.setFontSize(9);
-    pdf.text(`${currentNesting.panelLengthMm} × ${currentNesting.panelWidthMm} mm`, margin, i === 0 ? 50 : 26);
-    pdf.text(`Chute : ${wastePct} %`, margin, i === 0 ? 56 : 32);
+    pdf.text(`${currentNesting.panelLengthMm} × ${currentNesting.panelWidthMm} mm`, margin, topY + 6);
+    pdf.text(`Chute : ${wastePct} %`, margin, topY + 12);
 
-    const yListStart = i === 0 ? 62 : 38;
+    const yListStart = topY + 18;
     let yList = yListStart;
 
     const colW = [8, 22, 12, 12];
@@ -246,7 +315,7 @@ async function exportPDFCalpinage(panelInputs) {
       yList += rowH;
     });
 
-    const yDraw = i === 0 ? 68 : 44;
+    const yDraw = topY + 24;
     const maxH = pageH - yDraw - margin;
     const scale = Math.min(drawAreaW / currentNesting.panelLengthMm, maxH / currentNesting.panelWidthMm);
     const drawW = currentNesting.panelLengthMm * scale;
@@ -340,12 +409,22 @@ function formatCalpinageResult(nesting, panel) {
   const utilization = totalPanelArea > 0 ? (100 * totalUsedArea / totalPanelArea).toFixed(1) : "0";
   const wastePct = nesting.wastePct != null ? nesting.wastePct.toFixed(1) : (totalPanelArea > 0 ? (100 * (nesting.totalWaste || 0) / totalPanelArea).toFixed(1) : "0");
 
+  const numPanels = nesting.panels.length;
+  const materialCost = (panel.panelPrice != null && panel.panelPrice > 0) ? (numPanels * panel.panelPrice).toFixed(2) : null;
+  const cutSegs = nesting.totalCutSegments != null ? nesting.totalCutSegments : 0;
+  const cutTimeSec = Math.round((cutSegs * (panel.timePerCut || 25)) + (numPanels * (panel.timePerPanel || 60)));
+  const cutTimeMin = Math.floor(cutTimeSec / 60);
+  const cutTimeSecRest = cutTimeSec % 60;
+  const cutTimeStr = cutTimeMin > 0 ? `~ ${cutTimeMin} min ${cutTimeSecRest > 0 ? cutTimeSecRest + " s" : ""}` : `~ ${cutTimeSec} s`;
+
   let html = '<div class="result" id="result-content">';
   html += '<div class="result-summary" style="display:flex; flex-wrap:wrap; gap:0.4rem; align-items:center; margin:0.2rem 0 0.8rem;">';
-  html += `<span class="tag">${nesting.panels.length} panneau(x)</span>`;
+  html += `<span class="tag">${numPanels} panneau(x)</span>`;
   html += `<span class="tag">Utilisation ${utilization} %</span>`;
   html += `<span class="tag">Chute ${wastePct} %</span>`;
-  if (nesting.totalCutSegments != null) html += `<span class="tag">Traits de scie : ${nesting.totalCutSegments}</span>`;
+  if (cutSegs > 0) html += `<span class="tag">Traits de scie : ${cutSegs}</span>`;
+  if (materialCost != null) html += `<span class="tag">Matière : ${materialCost} €</span>`;
+  html += `<span class="tag">Temps découpe : ${cutTimeStr}</span>`;
   html += `</div>`;
 
   html += `<p><strong>Panneau :</strong> ${nesting.panelLengthMm} × ${nesting.panelWidthMm} mm | Épaisseur : ${panel.thicknessMm} mm | Revêtement : ${getCoatingLabel(panel.coating)} | Lame : ${nesting.sawKerfMm} mm</p>`;
@@ -472,13 +551,16 @@ function applyProjectData(project) {
   $("panelThickness").value = p.thicknessMm ?? 19;
   if ($("panelCoating")) $("panelCoating").value = p.coating ?? "melamine";
   $("sawKerf").value = p.sawKerfMm ?? 3;
+  if ($("panelPrice")) $("panelPrice").value = (p.panelPrice != null ? p.panelPrice : 80);
+  if ($("timePerCut")) $("timePerCut").value = (p.timePerCut != null ? p.timePerCut : 25);
+  if ($("timePerPanel")) $("timePerPanel").value = (p.timePerPanel != null ? p.timePerPanel : 60);
 
   const container = $("piecesContainer");
   if (container) {
     container.innerHTML = "";
     const header = document.createElement("div");
     header.className = "piece-row piece-row-header";
-    header.innerHTML = `<span class="piece-name">Nom</span><span class="piece-length">Long. (mm)</span><span class="piece-width">Larg. (mm)</span><span class="piece-qty">Qté</span><span class="piece-chants">Chant long.</span><span class="piece-chants">Chant larg.</span><span class="piece-actions"></span>`;
+    header.innerHTML = `<span class="piece-name">Nom</span><span class="piece-length">Long. (mm)</span><span class="piece-width">Larg. (mm)</span><span class="piece-qty">Qté</span><span class="piece-preview">Aperçu / Chants</span><span class="piece-actions"></span>`;
     container.appendChild(header);
     if (pieces.length === 0) {
       addPieceRow({});
