@@ -18,8 +18,11 @@ function solvePanelNesting(panel, pieces, options = {}) {
     const qty = Math.max(0, Math.floor(Number(p.qty) || 0));
     const name = p.name != null ? String(p.name).trim() || `Pièce ${idx + 1}` : `Pièce ${idx + 1}`;
     const id = p.id != null ? p.id : `p${idx}`;
-    const chantLongueur = !!p.chantLongueur;
-    const chantLargeur = !!p.chantLargeur;
+    const hasFour = p.chantTop != null || p.chantRight != null || p.chantBottom != null || p.chantLeft != null;
+    const chantTop = hasFour ? !!p.chantTop : !!p.chantLongueur;
+    const chantRight = hasFour ? !!p.chantRight : !!p.chantLargeur;
+    const chantBottom = hasFour ? !!p.chantBottom : !!p.chantLongueur;
+    const chantLeft = hasFour ? !!p.chantLeft : !!p.chantLargeur;
     for (let k = 0; k < qty; k++) {
       expanded.push({
         id,
@@ -29,8 +32,12 @@ function solvePanelNesting(panel, pieces, options = {}) {
         originalLength: len,
         originalWidth: wid,
         rotated: false,
-        chantLongueur,
-        chantLargeur
+        chantTop,
+        chantRight,
+        chantBottom,
+        chantLeft,
+        chantLongueur: chantTop || chantBottom,
+        chantLargeur: chantLeft || chantRight
       });
     }
   });
@@ -154,10 +161,21 @@ function runOnePass(panelW, panelH, kerf, toPlace, allowRotation) {
       rotated: bestRotated,
       x: bestRect.x,
       y: bestRect.y,
-      chantLongueur: piece.chantLongueur,
-      chantLargeur: piece.chantLargeur,
       pieceIndex
     };
+    if (bestRotated) {
+      placed.chantTop = piece.chantRight;
+      placed.chantRight = piece.chantBottom;
+      placed.chantBottom = piece.chantLeft;
+      placed.chantLeft = piece.chantTop;
+    } else {
+      placed.chantTop = piece.chantTop;
+      placed.chantRight = piece.chantRight;
+      placed.chantBottom = piece.chantBottom;
+      placed.chantLeft = piece.chantLeft;
+    }
+    placed.chantLongueur = placed.chantTop || placed.chantBottom;
+    placed.chantLargeur = placed.chantLeft || placed.chantRight;
     pan.pieces.push(placed);
     pan.usedArea += w * h;
 

@@ -213,6 +213,10 @@ function computeAll() {
     },
     pieces.map(p => ({
       ...p,
+      chantTop: !!p.chantTop,
+      chantRight: !!p.chantRight,
+      chantBottom: !!p.chantBottom,
+      chantLeft: !!p.chantLeft,
       chantLongueur: p.chantTop || p.chantBottom,
       chantLargeur: p.chantLeft || p.chantRight
     })),
@@ -279,8 +283,8 @@ async function exportPDFCalpinage(panelInputs) {
       pdf.text(`Panneau : ${currentNesting.panelLengthMm} × ${currentNesting.panelWidthMm} mm  |  Épaisseur : ${panel.thicknessMm} mm  |  Revêtement : ${getCoatingLabel(panel.coating)}  |  Lame : ${currentNesting.sawKerfMm} mm`, margin, 29);
       pdf.text(`Nombre total de panneaux : ${currentNesting.panels.length}  |  Chute totale : ${wastePct} %  |  Utilisation : ${(100 - parseFloat(wastePct)).toFixed(1)} %`, margin, 35);
       if (panel.panelPrice != null && panel.panelPrice > 0) {
-        const volM3 = (currentNesting.totalUsedArea * panel.thicknessMm) / 1e9;
-        pdf.text(`Coût matière (volume utilisé) : ${(volM3 * panel.panelPrice).toFixed(2)} €`, margin, 41);
+        const cost = currentNesting.panels.length * panel.panelPrice;
+        pdf.text(`Coût matière (panneaux) : ${cost.toFixed(2)} €`, margin, 41);
       }
       const cutSegs = currentNesting.totalCutSegments != null ? currentNesting.totalCutSegments : 0;
       const cutTimeSec = Math.round((cutSegs * (panel.timePerCut || 25)) + (currentNesting.panels.length * (panel.timePerPanel || 60)));
@@ -354,10 +358,10 @@ async function exportPDFCalpinage(panelInputs) {
       const py = yDraw + p.y * scale;
       const w = p.lengthMm * scale;
       const h = p.widthMm * scale;
-      const chantTop = p.rotated ? p.chantLargeur : p.chantLongueur;
-      const chantBottom = p.rotated ? p.chantLargeur : p.chantLongueur;
-      const chantLeft = p.rotated ? p.chantLongueur : p.chantLargeur;
-      const chantRight = p.rotated ? p.chantLongueur : p.chantLargeur;
+      const chantTop = (p.chantTop != null ? !!p.chantTop : (p.rotated ? p.chantLargeur : p.chantLongueur));
+      const chantBottom = (p.chantBottom != null ? !!p.chantBottom : (p.rotated ? p.chantLargeur : p.chantLongueur));
+      const chantLeft = (p.chantLeft != null ? !!p.chantLeft : (p.rotated ? p.chantLongueur : p.chantLargeur));
+      const chantRight = (p.chantRight != null ? !!p.chantRight : (p.rotated ? p.chantLongueur : p.chantLargeur));
 
       pdf.setDrawColor(60, 60, 60);
       pdf.setLineWidth(0.45);
@@ -431,10 +435,8 @@ function formatCalpinageResult(nesting, panel) {
   const wastePct = nesting.wastePct != null ? nesting.wastePct.toFixed(1) : (totalPanelArea > 0 ? (100 * (nesting.totalWaste || 0) / totalPanelArea).toFixed(1) : "0");
 
   const numPanels = nesting.panels.length;
-  const volumeUsedMm3 = totalUsedArea * (panel.thicknessMm || 0);
-  const volumeUsedM3 = volumeUsedMm3 / 1e9;
-  const materialCost = (panel.panelPrice != null && panel.panelPrice > 0 && volumeUsedM3 > 0)
-    ? (volumeUsedM3 * panel.panelPrice).toFixed(2)
+  const materialCost = (panel.panelPrice != null && panel.panelPrice > 0 && numPanels > 0)
+    ? (numPanels * panel.panelPrice).toFixed(2)
     : null;
   const cutSegs = nesting.totalCutSegments != null ? nesting.totalCutSegments : 0;
   const cutTimeSec = Math.round((cutSegs * (panel.timePerCut || 25)) + (numPanels * (panel.timePerPanel || 60)));
@@ -448,7 +450,7 @@ function formatCalpinageResult(nesting, panel) {
   html += `<span class="tag">Utilisation ${utilization} %</span>`;
   html += `<span class="tag">Chute ${wastePct} %</span>`;
   if (cutSegs > 0) html += `<span class="tag">Traits de scie : ${cutSegs}</span>`;
-  if (materialCost != null) html += `<span class="tag">Matière (vol. utilisé) : ${materialCost} €</span>`;
+  if (materialCost != null) html += `<span class="tag">Coût matière (panneaux) : ${materialCost} €</span>`;
   html += `<span class="tag">Temps découpe : ${cutTimeStr}</span>`;
   html += `</div>`;
 
@@ -481,10 +483,10 @@ function injectCalpinageSVG(container, panelData, panelL, panelW, kerf) {
     const y = p.y * scale;
     const pw = p.lengthMm * scale;
     const ph = p.widthMm * scale;
-    const chantTop = p.rotated ? p.chantLargeur : p.chantLongueur;
-    const chantBottom = p.rotated ? p.chantLargeur : p.chantLongueur;
-    const chantLeft = p.rotated ? p.chantLongueur : p.chantLargeur;
-    const chantRight = p.rotated ? p.chantLongueur : p.chantLargeur;
+    const chantTop = (p.chantTop != null ? !!p.chantTop : (p.rotated ? p.chantLargeur : p.chantLongueur));
+    const chantBottom = (p.chantBottom != null ? !!p.chantBottom : (p.rotated ? p.chantLargeur : p.chantLongueur));
+    const chantLeft = (p.chantLeft != null ? !!p.chantLeft : (p.rotated ? p.chantLongueur : p.chantLargeur));
+    const chantRight = (p.chantRight != null ? !!p.chantRight : (p.rotated ? p.chantLongueur : p.chantLargeur));
 
     const color = `hsl(${(i * 47) % 360}, 55%, 88%)`;
     svg += `<rect x="${x}" y="${y}" width="${pw}" height="${ph}" fill="${color}" stroke="none"/>`;
