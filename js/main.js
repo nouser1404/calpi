@@ -119,9 +119,9 @@ function addPieceRow(data = {}) {
   row.className = "piece-row";
   row.innerHTML = `
     <select class="piece-name" title="Nom de la pièce">${nameOptions}</select>
-    <input type="number" class="piece-length" min="1" step="1" placeholder="Long." value="${escapeAttr(String(len))}">
-    <input type="number" class="piece-width" min="1" step="1" placeholder="Larg." value="${escapeAttr(String(wid))}">
     <select class="piece-qty" title="Quantité">${Array.from({ length: 30 }, (_, i) => i + 1).map(n => `<option value="${n}"${n === qty ? " selected" : ""}>${n}</option>`).join("")}</select>
+    <input type="text" class="piece-length" inputmode="numeric" pattern="[0-9]*" placeholder="Long." value="${escapeAttr(String(len))}" maxlength="6" title="Longueur en mm (chiffres uniquement)">
+    <input type="text" class="piece-width" inputmode="numeric" pattern="[0-9]*" placeholder="Larg." value="${escapeAttr(String(wid))}" maxlength="6" title="Largeur en mm (chiffres uniquement)">
     <div class="piece-preview-wrap" role="img" aria-label="Aperçu pièce — cliquer sur un bord pour chant">
       <input type="checkbox" class="chant-top" aria-hidden="true" ${chantTop ? "checked" : ""} hidden>
       <input type="checkbox" class="chant-right" aria-hidden="true" ${chantRight ? "checked" : ""} hidden>
@@ -174,8 +174,14 @@ function addPieceRow(data = {}) {
     if (line && cb) line.addEventListener("click", () => { cb.checked = !cb.checked; updatePreview(); });
   });
 
-  row.querySelector(".piece-length").addEventListener("input", updatePreview);
-  row.querySelector(".piece-width").addEventListener("input", updatePreview);
+  function allowDigitsOnly(inputEl) {
+    const raw = inputEl.value.replace(/\D/g, "");
+    if (raw !== inputEl.value) inputEl.value = raw;
+  }
+  const lenInput = row.querySelector(".piece-length");
+  const widInput = row.querySelector(".piece-width");
+  lenInput.addEventListener("input", () => { allowDigitsOnly(lenInput); updatePreview(); });
+  widInput.addEventListener("input", () => { allowDigitsOnly(widInput); updatePreview(); });
   [cbTop, cbRight, cbBottom, cbLeft].forEach(cb => { if (cb) cb.addEventListener("change", updatePreview); });
   updatePreview();
 
@@ -587,7 +593,7 @@ function applyProjectData(project) {
     container.innerHTML = "";
     const header = document.createElement("div");
     header.className = "piece-row piece-row-header";
-    header.innerHTML = `<span class="piece-name">Nom</span><span class="piece-length">Long. (mm)</span><span class="piece-width">Larg. (mm)</span><span class="piece-qty">Qté</span><span class="piece-preview">Aperçu / Chants</span><span class="piece-actions"></span>`;
+    header.innerHTML = `<span class="piece-name">Nom</span><span class="piece-qty">Qté</span><span class="piece-length">Long. (mm)</span><span class="piece-width">Larg. (mm)</span><span class="piece-preview">Aperçu / Chants</span><span class="piece-actions"></span>`;
     container.appendChild(header);
     if (pieces.length === 0) {
       addPieceRow({});
