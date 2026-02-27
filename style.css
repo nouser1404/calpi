@@ -36,6 +36,32 @@ body {
 h1 { margin: 0 0 0.5rem 0; font-size: 1.6rem; }
 h2 { margin: 1rem 0 0.8rem 0; font-size: 1.15rem; }
 
+/* Titre de section avec infobulle à droite */
+.section-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.section-title .info-tooltip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.1rem;
+  height: 1.1rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--muted);
+  border: 1px solid var(--border-2);
+  border-radius: 50%;
+  cursor: help;
+  flex-shrink: 0;
+}
+.section-title .info-tooltip:hover {
+  color: #333;
+  border-color: #999;
+  background: #f5f5f5;
+}
+
 label { display: block; margin-top: 0.8rem; font-weight: 600; }
 
 input, textarea, select {
@@ -154,6 +180,30 @@ ul.hint li{ margin: 0.2rem 0; }
 }
 @media (max-width: 640px){
   .row-2 { grid-template-columns: 1fr; }
+}
+
+.row-4 {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.8rem;
+  align-items: end;
+  margin-top: 0.2rem;
+}
+.row-4 > div {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.row-4 label { margin-top: 0; }
+.row-4 input,
+.row-4 select {
+  max-width: none;
+}
+@media (max-width: 720px) {
+  .row-4 { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 420px) {
+  .row-4 { grid-template-columns: 1fr; }
 }
 
 .inline-label{
@@ -385,7 +435,7 @@ th { background:#f0f0f0; }
 
 .piece-row {
   display: grid;
-  grid-template-columns: minmax(100px, 1fr) 150px 150px 70px 150px 40px;
+  grid-template-columns: minmax(100px, 1fr) 150px 150px 150px 85px 40px;
   gap: 0.6rem;
   align-items: stretch;
   min-height: 2.75rem;
@@ -472,6 +522,8 @@ th { background:#f0f0f0; }
   height: 2.5rem;
   align-self: center;
   min-width: 2.5rem;
+  border: none;
+  color: #b00;
 }
 
 @media (max-width: 768px) {
