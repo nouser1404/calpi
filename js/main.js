@@ -42,6 +42,7 @@ function readPanelInputs() {
   const widthMm = parseFloat($("panelWidth").value);
   const thicknessMm = parseFloat($("panelThickness").value);
   const coating = ($("panelCoating") && $("panelCoating").value) || "melamine";
+  const grainAlongLength = $("grainAlongLength") ? $("grainAlongLength").checked : false;
   const sawKerfMm = parseFloat($("sawKerf").value) || 0;
   const panelPrice = parseFloat($("panelPrice") && $("panelPrice").value);
   const timePerCut = parseFloat($("timePerCut") && $("timePerCut").value) || 25;
@@ -51,6 +52,7 @@ function readPanelInputs() {
     widthMm: isNaN(widthMm) ? 1900 : widthMm,
     thicknessMm: isNaN(thicknessMm) ? 19 : thicknessMm,
     coating,
+    grainAlongLength: !!grainAlongLength,
     sawKerfMm: isNaN(sawKerfMm) ? 3 : Math.max(0, sawKerfMm),
     panelPrice: isNaN(panelPrice) || panelPrice < 0 ? null : panelPrice,
     timePerCut: Math.max(0, timePerCut),
@@ -226,7 +228,7 @@ function computeAll() {
       chantLongueur: p.chantTop || p.chantBottom,
       chantLargeur: p.chantLeft || p.chantRight
     })),
-    { allowRotation: true }
+    { allowRotation: !panel.grainAlongLength }
   );
 
   renderAll(panel);
@@ -583,6 +585,7 @@ function applyProjectData(project) {
   $("panelWidth").value = p.widthMm ?? 1900;
   $("panelThickness").value = p.thicknessMm ?? 19;
   if ($("panelCoating")) $("panelCoating").value = p.coating ?? "melamine";
+  if ($("grainAlongLength")) $("grainAlongLength").checked = !!p.grainAlongLength;
   $("sawKerf").value = p.sawKerfMm ?? 3;
   if ($("panelPrice")) $("panelPrice").value = (p.panelPrice != null ? p.panelPrice : 80);
   if ($("timePerCut")) $("timePerCut").value = (p.timePerCut != null ? p.timePerCut : 25);

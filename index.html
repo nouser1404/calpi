@@ -41,15 +41,23 @@
             <input id="sawKerf" type="number" min="0" step="0.1" value="3">
           </div>
         </div>
-        <label for="panelCoating">Type de revêtement</label>
-        <select id="panelCoating">
-          <option value="melamine">Mélaminé</option>
-          <option value="stratifie">Stratifié</option>
-          <option value="contreplaque">Contreplaqué</option>
-          <option value="mdf">MDF</option>
-          <option value="osb">OSB</option>
-          <option value="autre">Autre</option>
-        </select>
+        <div class="row-2">
+          <div>
+            <label for="panelCoating">Type de revêtement</label>
+            <select id="panelCoating">
+              <option value="melamine">Mélaminé</option>
+              <option value="stratifie">Stratifié</option>
+              <option value="contreplaque">Contreplaqué</option>
+              <option value="mdf">MDF</option>
+              <option value="osb">OSB</option>
+              <option value="autre">Autre</option>
+            </select>
+          </div>
+          <div class="row-check" style="margin-top:0.8rem;">
+            <input id="grainAlongLength" type="checkbox" title="Le fil du panneau reste parallèle à la longueur de chaque pièce (pas de rotation 90°).">
+            <label for="grainAlongLength" class="inline-label">Sens du fil : fil dans le sens de la longueur de la pièce</label>
+          </div>
+        </div>
         <div class="row-2">
           <div>
             <label for="panelPrice">Prix par panneau (€)</label>
